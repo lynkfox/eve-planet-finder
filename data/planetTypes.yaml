@@ -1,0 +1,208 @@
+"11":
+  capacity: 0
+  description: "Life-bearing worlds are often referred to as \"temperate\", as their\
+    \ mild temperatures are one of their defining features. Planets with existing,\
+    \ stable ecosystems are prime targets for colonization efforts as they are generally\
+    \ easier to make fully habitable; as a result, the majority of highly populated\
+    \ worlds are of this type. Indeed, it is not altogether uncommon for detailed\
+    \ surveys to reveal signs of previous settlements from various stages of New Eden's\
+    \ history."
+  graphic_id: 3832
+  group_id: 7
+  icon_id: 10136
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Temperate)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 11
+  volume: 1
+"12":
+  capacity: 0
+  description: "The majority of icy planets went through a period of being barren\
+    \ terrestrials, before being surfaced with ice over the course of many millennia.\
+    \ The exact process for this varies from case to case, but the end result is both\
+    \ common and visually uniform - a bright, reflective planet scored by countless\
+    \ fractures and crevasses. A few icy planets are hypothesized to have been warmer,\
+    \ liquid-bearing planets in the past that have subsequently frozen, as a result\
+    \ of either stellar cooling or failed terraforming projects."
+  graphic_id: 3834
+  group_id: 7
+  icon_id: 10137
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Ice)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 12
+  volume: 1
+"13":
+  capacity: 0
+  description: "Gas planets are characterized by a deep, opaque upper atmosphere,\
+    \ usually composed primarily of light elements such as hydrogen or helium. Simple\
+    \ chemicals can add a range of hues and shades in the visual spectrum, and the\
+    \ interaction between upwellings and rapidly circulating pressure bands result\
+    \ in a huge variety of visible surface structures. A similar level of diversity\
+    \ can be found beneath the cloud-tops: the inner composition of a given gas planet\
+    \ might belong to any one of a dozen broad groups, with no two planets entirely\
+    \ alike in this regard."
+  graphic_id: 3833
+  group_id: 7
+  icon_id: 10139
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Gas)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 13
+  volume: 1
+"2014":
+  capacity: 0
+  description: "Oceanic worlds are a class of terrestrial world covered entirely by\
+    \ liquids, usually in the form of mundane water. While the liquid surface is exceptionally\
+    \ smooth, the ocean floor on most worlds of this type exhibits significant topographic\
+    \ variety. It is this subsurface irregularity which causes the formation of complex\
+    \ weather systems, which would otherwise revert to more uniform patterns."
+  graphic_id: 3835
+  group_id: 7
+  icon_id: 10142
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Oceanic)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 2014
+  volume: 1
+"2015":
+  capacity: 0
+  description: "So-called \"lava planets\" (properly \"magmatic planets\") fall into\
+    \ one of three groups: solar magmatics, which orbit sufficiently close to their\
+    \ star that the surface never cools enough to solidify; gravitational magmatics,\
+    \ which experience gravitational shifts sufficiently strong to regularly and significantly\
+    \ fracture cooling crusts; and magmatoids, which are for largely-unexplained reasons\
+    \ simply incapable of cooling and forming a persistent crust. All three types\
+    \ generally exhibit the same external phenomena - huge red-orange lava fields\
+    \ being a defining feature - but the latter two types are sometimes capable of\
+    \ briefly solidifying for a period measured in years or perhaps decades."
+  graphic_id: 3836
+  group_id: 7
+  icon_id: 10133
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Lava)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 2015
+  volume: 1
+"2016":
+  capacity: 0
+  description: "Barren planets are archetypical \"dead terrestrials\": dry, rocky\
+    \ worlds with a minimal atmosphere and an unremarkable composition. They are commonly\
+    \ etched with flood channels, which are often broad enough to be visible from\
+    \ orbit; most such worlds have accumulated significant quantities of ice over\
+    \ their lifetimes, but cannot retain it on their surface. Generally surface liquid\
+    \ evaporates rapidly, contributing to the thin atmosphere, but occasionally it\
+    \ will seep back into the ground and refreeze, ready for another breakout in future\
+    \ when the local temperature rises."
+  graphic_id: 3837
+  group_id: 7
+  icon_id: 10135
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Barren)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 2016
+  volume: 1
+"2017":
+  capacity: 0
+  description: "Storm worlds are usually considered terrestrial planets, although\
+    \ to a casual eye they may appear more similar to gas planets, given their opaque,\
+    \ high-pressure atmospheres. Geomorphically, however, the distinctions are clear:\
+    \ compared to a gas world, the atmosphere of a storm world is usually considerably\
+    \ shallower, and generally composed primarily of more complex chemicals, while\
+    \ the majority of the planet's mass is a rocky terrestrial ball. Their name is\
+    \ derived from the continent-scale electrical storms that invariably flash through\
+    \ their upper atmospheres."
+  graphic_id: 3935
+  group_id: 7
+  icon_id: 10134
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Storm)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 2017
+  volume: 1
+"2063":
+  capacity: 0
+  description: "The aptly-named \"plasma planets\" have captured the imagination of\
+    \ countless artists and inspired innumerable works, yet the physics behind them\
+    \ are surprisingly mundane by cosmological standards. A rocky terrestrial with\
+    \ the right kind of atmosphere and magnetic field will, when bombarded with solar\
+    \ radiation, generate sprawling plasma storms as specific atmospheric elements\
+    \ are stripped of their electrons. Over time these storms will generally scorch\
+    \ the surface rock black, adding to the visual impact."
+  graphic_id: 3941
+  group_id: 7
+  icon_id: 10138
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Plasma)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 2063
+  volume: 1
+"30889":
+  capacity: 0
+  description: "Shattered worlds were once terrestrial planets, torn asunder by some\
+    \ immense cataclysm. All such worlds in the New Eden cluster are products of the\
+    \ disastrous stellar events that occurred during the \"Seyllin Incident\". However,\
+    \ reports continue to circulate of similar planets discovered in the unmapped\
+    \ systems reached exclusively through unstable wormholes. How these met their\
+    \ fate, if indeed they exist at all, is unknown."
+  graphic_id: 202
+  group_id: 7
+  icon_id: 10140
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Shattered)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 30889
+  volume: 1
+"73911":
+  capacity: 0
+  description: "This barren planet has been scorched by the high-energy radiation\
+    \ of an extreme stellar event. The radiation burst blasted the surface and ionized\
+    \ what little remains of the sparse atmosphere of an already harsh and unforgiving\
+    \ world. It seems unlikely that anything could have survived the event that scarred\
+    \ this planet and it will continue to swing lifelessly around its disrupted and\
+    \ highly-energetic star.\r\n\r\nTypically barren planets are \"dead terrestrials\"\
+    : dry, rocky worlds with a minimal atmosphere and an unremarkable composition.\
+    \ They are commonly etched with flood channels, which are often broad enough to\
+    \ be visible from orbit; most such worlds have accumulated significant quantities\
+    \ of ice over their lifetimes, but cannot retain it on their surface. Generally\
+    \ surface liquid evaporates rapidly, contributing to the thin atmosphere, but\
+    \ occasionally it will seep back into the ground and refreeze, ready for another\
+    \ breakout in future when the local temperature rises."
+  graphic_id: 25676
+  group_id: 7
+  icon_id: 10133
+  mass: 100000000000000000000000000000000000
+  name: "Planet (Scorched Barren)"
+  packaged_volume: 1
+  portion_size: 1
+  published: false
+  radius: 10000
+  type_id: 73911
+  volume: 1
