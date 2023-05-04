@@ -1,33 +1,53 @@
 from buildMapData import *
 from models.map import AllData, System
 from models.common import Universe
+from calculateCloseness import *
 
 import plotly.graph_objects as go
 import networkx as nx
 
-POSITION_RELATIVE=100000000
+POSITION_RELATIVE=1
 
 def DisplayMap():
-    all_data = AllData().PopulateFromPickles()
+    all_data = LoadPickles(regions=False, constellations=False)
+
+    systemWeights = CalculateCloseness(RawResourcesDesired, 3, all_data)
 
     systemMap = nx.Graph()
 
     node_x = []
     node_y = []
     node_names = []
+    edge_x = []
+    edge_y = []
+    node_weight = []
+    node_text = []
+    top_weight = 0.0
+    top_system = []
+    top_values = []
     for system in all_data.Systems.values():
+
         if system.Position.Universe == Universe.WORMHOLE:
             continue
+
         systemMap.add_node(system.Name)
         node_names.append(system.Name)
         node_x.append(system.Position.X/POSITION_RELATIVE)
         node_y.append(system.Position.Y/POSITION_RELATIVE)
+        weight = systemWeights[system.Id]["Weight"]
 
-    edge_x = []
-    edge_y = []
-    LinkMaps(all_data.Stargates, all_data.Systems)
-    LinkMaps(all_data.Systems, all_data.Stargates)
-    for system in all_data.Systems.values():
+        if weight > top_weight:
+            top_weight = weight
+            top_system = [system.Name]
+            top_values = [systemWeights[system.Id]["Surrounding Systems"]]
+
+        elif weight == top_weight:
+            top_system.append(system.Name)
+            top_values.extend(systemWeights[system.Id]["Surrounding Systems"])
+        node_weight.append(weight)
+        node_text.append(f"{system.Name}: {weight}")
+
+
         for destination in system.Links:
             systemMap.add_edge(system.Name, destination.Name)
             edge_x.append(system.Position.X/POSITION_RELATIVE)
@@ -36,7 +56,7 @@ def DisplayMap():
             edge_y.append(system.Position.Y/POSITION_RELATIVE)
             edge_y.append(destination.Position.Y/POSITION_RELATIVE)
             edge_y.append(None)
-            
+        
 
 
 
@@ -63,23 +83,20 @@ def DisplayMap():
             size=10,
             colorbar=dict(
                 thickness=15,
-                title='Node Connections',
+                title='More PI Planets, Closer',
                 xanchor='left',
                 titleside='right'
             ),
             line_width=2))
-    node_adjacencies = []
-    node_text = []
-    for node, adjacencies in enumerate(systemMap.adjacency()):
-        node_adjacencies.append(len(adjacencies[1]))
-        node_text.append(node_names[node])
+    
+    
 
-    node_trace.marker.color = node_adjacencies
+    node_trace.marker.color = node_weight
     node_trace.text = node_text
 
     fig = go.Figure(data=[edge_trace, node_trace],
              layout=go.Layout(
-                title='<br>Network graph made with Python',
+                title=f'<br>Eve Online System Map - Weighted by Closeness for all PI for Integrity Response Drones<br>{top_system} with weight of {top_weight}',
                 titlefont_size=16,
                 showlegend=False,
                 hovermode='closest',
@@ -93,6 +110,21 @@ def DisplayMap():
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                 )
     fig.show()
+
+    del all_data
+    print(f"=======Top System=======")
+    print(f"     {top_system}")
+    print(f"Closest Systems:")
+    for source_system in top_values:
+        unsorted_systems = [s for s in source_system.values()]
+        systems = sorted(unsorted_systems, key=lambda d: d["Jumps Away"])
+
+        for sys in systems:
+            print(f"\t>>>>>__________ {sys['System Name']} __________<<<<<<")
+            print(f"\t\t- Jumps away:                {sys['Jumps Away']}")
+            print(f"\t\t- Planet Types Available:    {sys['Planet Types']}")
+
+
 
 
 if __name__ == "__main__":

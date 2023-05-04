@@ -75,14 +75,16 @@ def BuildMapData():
     
     print(f"All data loaded: total time = {DECIMAL_FORMAT.format(perf_counter()-start_first)} seconds")
 
-def LinkAllMaps(map_data: AllData):
-    start = perf_counter()
-    LinkMaps(map_data.Regions, map_data.Constellations)
-    print(f"Constellations Linked to Regions in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+def LinkAllMaps(map_data: AllData, regions=True, constellations=True):
+    if regions:
+        start = perf_counter()
+        LinkMaps(map_data.Regions, map_data.Constellations)
+        print(f"Constellations Linked to Regions in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
-    start = perf_counter()
-    LinkMaps(map_data.Constellations, map_data.Systems)
-    print(f"Systems linked to Constellations in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+    if constellations:
+        start = perf_counter()
+        LinkMaps(map_data.Constellations, map_data.Systems)
+        print(f"Systems linked to Constellations in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
     
     start = perf_counter()
     LinkMaps(map_data.Stargates, map_data.Systems)
@@ -115,10 +117,10 @@ def LinkAllMaps(map_data: AllData):
 def PickleAll():
     all_map_data.PickleData()
 
-def LoadPickles()->AllData:
+def LoadPickles(regions=False, constellations=False)->AllData:
     all_map = AllData()
     all_map = all_map.PopulateFromPickles()
-    return LinkAllMaps(all_map)
+    return LinkAllMaps(all_map, regions=regions, constellations=constellations)
      
 
 if __name__ == "__main__":

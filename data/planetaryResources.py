@@ -1,4 +1,6 @@
+from __future__ import annotations
 from models.map import PIMaterial
+
 
 
 
@@ -123,6 +125,24 @@ RawResources = {
         Ingredients = [],
         Products=[]
     ),
+}
+
+ResourceNameMap ={
+    "Aqueous Liquids": "2268",
+    "Autotrophs":"2305",
+    "Base Metals": "2267",
+    "Carbon Compounds": "2288",
+    "Complex Organisms":"2287",
+    "Felsic Magma": "2307",
+    "Heavy Metals": "2272",
+    "Micro-Organisms": "2073",
+    "Ionic Solutions": "2309",
+    "Noble Gas": "2310",
+    "Noble Metals": "2270",
+    "Non-CS Crystals": "2306",
+    "Planktic Colonies": "2286",
+    "Reactive Gas": "2311",
+    "Suspended Plasma": "2308"
 }
 
 # Types

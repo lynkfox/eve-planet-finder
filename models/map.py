@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from models.common import *
-from typing import Any, Dict
+from typing import Any, Dict, List
 from pickle import dump, load
 import re
 
@@ -31,6 +31,16 @@ class iStaticDataExport():
                     output[key]=value
                 continue
         return output
+
+@dataclass
+class PotentialSite():
+    SystemName: str
+    SystemId: int
+    Planets: List[Planet]
+    PlanetType: PlanetType
+    JumpsFromSource: int
+
+
 
 @dataclass
 class AllData():
@@ -228,6 +238,7 @@ class System(iStaticDataExport):
     SecurityStatus: float = field(init=False, default=0.0)
     _pre_planets: list[int] = field(kw_only=True, default_factory=list)
     _pre_links: list[int] = field(kw_only=True, default_factory=list)
+    
 
     def Update(self, system: Any) ->int:
         self.Name = system["name"]
