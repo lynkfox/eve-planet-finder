@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from models.common import *
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from pickle import dump, load
 import re
 
@@ -39,6 +39,36 @@ class PotentialSite():
     Planets: List[Planet]
     PlanetType: PlanetType
     JumpsFromSource: int
+    SourceSystemName: str
+
+    def __eq__(self, __o: Union[PotentialSite, Any]) -> bool:
+        if isinstance(__o, str):
+            return self.SystemName == __o
+
+        if isinstance(__o, int):
+            return self.SystemId == __o
+
+        if isinstance(__o, list):
+            system_names = [site.SystemName for site in __o]
+            system_ids = [site.SystemId for site in __o]
+
+            return (self.SystemId in system_ids and self.SystemName in system_names)
+        
+        return (self.SystemId == __o.SystemId and self.SystemName == __o.SystemName)
+    
+    def __hash__(self) -> int:
+        return hash(self.SystemName+str(self.SystemId))
+
+    def __add__(self, right_hand:PotentialSite) -> PotentialSite:
+        new_site = PotentialSite(
+            SystemName=self.SystemName,
+            SystemId=self.SystemId,
+            PlanetType=self.PlanetType,
+            JumpsFromSource=self.JumpsFromSource if self.JumpsFromSource >= right_hand.JumpsFromSource else right_hand.JumpsFromSource,
+            SourceSystemName=self.SourceSystemName,
+            Planets=self.Planets.extend(right_hand.Planets)
+        )
+        return new_site
 
 
 

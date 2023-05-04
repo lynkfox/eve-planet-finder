@@ -8,12 +8,17 @@ import networkx as nx
 
 POSITION_RELATIVE=1
 
+INCLUDE_PLANET_NAMES = False
+
 def DisplayMap():
     all_data = LoadPickles(regions=False, constellations=False)
 
-    systemWeights = CalculateCloseness(RawResourcesDesired, 3, all_data)
+    systemWeights = CalculateCloseness(RawResourcesDesired, 1, all_data)
 
     systemMap = nx.Graph()
+
+    not_done_flag = True
+    display_results = not not_done_flag
 
     node_x = []
     node_y = []
@@ -22,28 +27,36 @@ def DisplayMap():
     edge_y = []
     node_weight = []
     node_text = []
-    top_weight = 0.0
+    top_weight = 0
     top_system = []
-    top_values = []
+    top_values = {}
     for system in all_data.Systems.values():
 
         if system.Position.Universe == Universe.WORMHOLE:
+            continue
+
+        if len(system.Links) == 0:
             continue
 
         systemMap.add_node(system.Name)
         node_names.append(system.Name)
         node_x.append(system.Position.X/POSITION_RELATIVE)
         node_y.append(system.Position.Y/POSITION_RELATIVE)
-        weight = systemWeights[system.Id]["Weight"]
-
+        weight = systemWeights[system.Id].TotalWeight
+        if weight == 1220 and not_done_flag:
+            for pot_site in systemWeights[system.Id].PotentialSites:
+                for entry in pot_site.Audit:
+                    print(entry)
+            not_done_flag=False
         if weight > top_weight:
             top_weight = weight
             top_system = [system.Name]
-            top_values = [systemWeights[system.Id]["Surrounding Systems"]]
+            top_values = {system.Name: systemWeights[system.Id].PotentialSites}
 
         elif weight == top_weight:
             top_system.append(system.Name)
-            top_values.extend(systemWeights[system.Id]["Surrounding Systems"])
+            top_values = {**top_values, **{system.Name: systemWeights[system.Id].PotentialSites}}
+
         node_weight.append(weight)
         node_text.append(f"{system.Name}: {weight}")
 
@@ -112,17 +125,23 @@ def DisplayMap():
     fig.show()
 
     del all_data
-    print(f"=======Top System=======")
-    print(f"     {top_system}")
-    print(f"Closest Systems:")
-    for source_system in top_values:
-        unsorted_systems = [s for s in source_system.values()]
-        systems = sorted(unsorted_systems, key=lambda d: d["Jumps Away"])
 
-        for sys in systems:
-            print(f"\t>>>>>__________ {sys['System Name']} __________<<<<<<")
-            print(f"\t\t- Jumps away:                {sys['Jumps Away']}")
-            print(f"\t\t- Planet Types Available:    {sys['Planet Types']}")
+    if display_results:
+        print(f"=======Top Systems=======")
+        print(f"     {top_system}")
+        print(f"Closest Systems:")
+        for key, source_system in top_values.items():
+            systems = sorted(source_system, key=lambda d: d.JumpsFromSource)
+
+            for sys in systems:
+                print(f"\n>>>>>__________ {key} __________<<<<<<")
+                print(f"\t- Jumps away:                {sys.JumpsFromSource}")
+                planet_types = " | ".join([key for key in sys.Planets.keys() if key!= "PlanetNames"])
+                print(f"\t- Planet Types Available:    {planet_types}")
+                if INCLUDE_PLANET_NAMES:
+                    for planetInfo in sys.Planets.values():
+                        print(f"\t\t== {planetInfo.Type}")
+                        print(f"\t\t --> {', '.join(planetInfo.Names)}")
 
 
 
