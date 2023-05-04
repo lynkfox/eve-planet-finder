@@ -6,7 +6,7 @@ RawResources = {
     "2268": PIMaterial(
         Name="Aqueous Liquids",
         Tier=0,
-        ResourceId=2268,
+        Id=2268,
         _pre_types=[2016, 13,12, 2014,11, 2017],
         Ingredients = [],
         Products=[]
@@ -14,7 +14,7 @@ RawResources = {
     "2305": PIMaterial(
         Name="Autotrophs",
         Tier=0,
-        ResourceId=2305,
+        Id=2305,
         _pre_types=[11],
         Ingredients = [],
         Products=[]
@@ -22,7 +22,7 @@ RawResources = {
     "2267": PIMaterial(
         Name="Base Metals",
         Tier=0,
-        ResourceId=2267,
+        Id=2267,
         _pre_types=[2016, 13,2015, 2063, 2017],
         Ingredients = [],
         Products=[]
@@ -30,7 +30,7 @@ RawResources = {
     "2288": PIMaterial(
         Name="Carbon Compounds",
         Tier=0,
-        ResourceId=2288,
+        Id=2288,
         _pre_types=[2016, 2014, 11],
         Ingredients = [],
         Products=[]
@@ -38,7 +38,7 @@ RawResources = {
     "2287": PIMaterial(
         Name="Complex Organisms",
         Tier=0,
-        ResourceId=2287,
+        Id=2287,
         _pre_types=[2014, 11],
         Ingredients = [],
         Products=[]
@@ -46,7 +46,7 @@ RawResources = {
     "2307": PIMaterial(
         Name="Felsic Magma",
         Tier=0,
-        ResourceId=2307,
+        Id=2307,
         _pre_types=[2015],
         Ingredients = [],
         Products=[]
@@ -54,7 +54,7 @@ RawResources = {
     "2272": PIMaterial(
         Name="Heavy Metals",
         Tier=0,
-        ResourceId=2272,
+        Id=2272,
         _pre_types=[12, 2015, 2063],
         Ingredients = [],
         Products=[]
@@ -62,7 +62,7 @@ RawResources = {
     "2309": PIMaterial(
         Name="Ionic Solutions",
         Tier=0,
-        ResourceId=2309,
+        Id=2309,
         _pre_types=[13, 2017],
         Ingredients = [],
         Products=[]
@@ -70,7 +70,7 @@ RawResources = {
     "2073": PIMaterial(
         Name="Micro-Organisms",
         Tier=0,
-        ResourceId=2073,
+        Id=2073,
         _pre_types=[2016, 12, 2014, 11],
         Ingredients = [],
         Products=[]
@@ -78,7 +78,7 @@ RawResources = {
     "2310": PIMaterial(
         Name="Noble Gas",
         Tier=0,
-        ResourceId=2310,
+        Id=2310,
         _pre_types=[13,12, 2017],
         Ingredients = [],
         Products=[]
@@ -86,7 +86,7 @@ RawResources = {
     "2270": PIMaterial(
         Name="Noble Metals",
         Tier=0,
-        ResourceId=2270,
+        Id=2270,
         _pre_types=[2016, 2063],
         Ingredients = [],
         Products=[]
@@ -94,7 +94,7 @@ RawResources = {
     "2306": PIMaterial(
         Name="Non-CS Crystals",
         Tier=0,
-        ResourceId=2306,
+        Id=2306,
         _pre_types=[2015, 2063],
         Ingredients = [],
         Products=[]
@@ -102,7 +102,7 @@ RawResources = {
     "2286": PIMaterial(
         Name="Planktic Colonies",
         Tier=0,
-        ResourceId=2286,
+        Id=2286,
         _pre_types=[12, 2014],
         Ingredients = [],
         Products=[]
@@ -110,7 +110,7 @@ RawResources = {
     "2311": PIMaterial(
         Name="Reactive Gas",
         Tier=0,
-        ResourceId=2311,
+        Id=2311,
         _pre_types=[13],
         Ingredients = [],
         Products=[]
@@ -118,7 +118,7 @@ RawResources = {
     "2308": PIMaterial(
         Name="Suspended Plasma",
         Tier=0,
-        ResourceId=2308,
+        Id=2308,
         _pre_types=[2015, 2063, 2017],
         Ingredients = [],
         Products=[]

@@ -1,9 +1,11 @@
 from buildMapData import *
 from models.map import AllData, System
+from models.common import Universe
 
 import plotly.graph_objects as go
 import networkx as nx
 
+POSITION_RELATIVE=100000000
 
 def DisplayMap():
     all_data = AllData().PopulateFromPickles()
@@ -12,21 +14,27 @@ def DisplayMap():
 
     node_x = []
     node_y = []
-    for system in all_data.Systems:
+    node_names = []
+    for system in all_data.Systems.values():
+        if system.Position.Universe == Universe.WORMHOLE:
+            continue
         systemMap.add_node(system.Name)
-        node_x.append(system.Position.X)
-        node_y.append(system.Position.Y)
+        node_names.append(system.Name)
+        node_x.append(system.Position.X/POSITION_RELATIVE)
+        node_y.append(system.Position.Y/POSITION_RELATIVE)
 
     edge_x = []
     edge_y = []
-    for system in all_data.Systems:
-        for edge in system.Links:
-            systemMap.add_edge(system.Name, edge.Name)
-            edge_x.append(system.Position.X)
-            edge_x.append(edge.Position.X)
+    LinkMaps(all_data.Stargates, all_data.Systems)
+    LinkMaps(all_data.Systems, all_data.Stargates)
+    for system in all_data.Systems.values():
+        for destination in system.Links:
+            systemMap.add_edge(system.Name, destination.Name)
+            edge_x.append(system.Position.X/POSITION_RELATIVE)
+            edge_x.append(destination.Position.X/POSITION_RELATIVE)
             edge_x.append(None)
-            edge_y.append(system.Position.Y)
-            edge_y.append(edge.Position.Y)
+            edge_y.append(system.Position.Y/POSITION_RELATIVE)
+            edge_y.append(destination.Position.Y/POSITION_RELATIVE)
             edge_y.append(None)
             
 
@@ -64,7 +72,7 @@ def DisplayMap():
     node_text = []
     for node, adjacencies in enumerate(systemMap.adjacency()):
         node_adjacencies.append(len(adjacencies[1]))
-        node_text.append('# of connections: '+str(len(adjacencies[1])))
+        node_text.append(node_names[node])
 
     node_trace.marker.color = node_adjacencies
     node_trace.text = node_text

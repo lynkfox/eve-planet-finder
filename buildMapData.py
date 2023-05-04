@@ -3,10 +3,8 @@ from models.map import *
 from data.planetaryResources import *
 import yaml
 from typing import Any
-from pathlib import Path
 import codecs
 from time import perf_counter
-import pickle
 
 DECIMAL_FORMAT = "{:.3f}"
 
@@ -24,6 +22,8 @@ def CreateMaps(file_path, obj) -> dict:
     for key, value in yamlFile.items():
         newValue = obj()
         item_id = newValue.Update(value)
+        if item_id == -1:
+            continue
         if item_id is None:
             item_id = key
         if isinstance(item_id, str):
@@ -70,25 +70,31 @@ def BuildMapData():
 
     print("\n=======All Data Loaded, starting links=========\n")
 
+    LinkAllMaps(all_map_data)
+    
+    
+    print(f"All data loaded: total time = {DECIMAL_FORMAT.format(perf_counter()-start_first)} seconds")
+
+def LinkAllMaps(map_data: AllData):
     start = perf_counter()
-    LinkMaps(all_map_data.Regions, all_map_data.Constellations)
+    LinkMaps(map_data.Regions, map_data.Constellations)
     print(f"Constellations Linked to Regions in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
     start = perf_counter()
-    LinkMaps(all_map_data.Constellations, all_map_data.Systems)
+    LinkMaps(map_data.Constellations, map_data.Systems)
     print(f"Systems linked to Constellations in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
     
     start = perf_counter()
-    LinkMaps(all_map_data.Stargates, all_map_data.Systems)
+    LinkMaps(map_data.Stargates, map_data.Systems)
     print(f"Stargates linked to Systems in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
     
     start = perf_counter()
-    LinkMaps(all_map_data.Planets, all_map_data.PlanetTypes)
+    LinkMaps(map_data.Planets, map_data.PlanetTypes)
     print(f"Planet Types linked to Planets in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
     start = perf_counter()
-    LinkMaps(all_map_data.RawResources, all_map_data.PlanetTypes)
-    LinkMaps(all_map_data.PlanetTypes, all_map_data.RawResources)
+    LinkMaps(map_data.RawResources, map_data.PlanetTypes)
+    LinkMaps(map_data.PlanetTypes, map_data.RawResources)
     print(f"Planet Types and Raw Resources linked in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
     # start = perf_counter()
@@ -97,23 +103,23 @@ def BuildMapData():
     # print(f"Commodity Production Chains Linked {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
     
     start = perf_counter()
-    LinkMaps(all_map_data.Systems, all_map_data.Planets)
+    LinkMaps(map_data.Systems, map_data.Planets)
     print(f"Planets linked to Systems in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
     
     start = perf_counter()
-    LinkMaps(all_map_data.Systems, all_map_data.Stargates)
+    LinkMaps(map_data.Systems, map_data.Stargates)
     print(f"Systems linked to each other in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    
-    print(f"All data loaded: total time = {DECIMAL_FORMAT.format(perf_counter()-start_first)} seconds")
+
+    return map_data
 
 def PickleAll():
     all_map_data.PickleData()
 
-def LoadPickles()->dict:
+def LoadPickles()->AllData:
     all_map = AllData()
-    all_map.PopulateFromPickle()
-    return all_map
+    all_map = all_map.PopulateFromPickles()
+    return LinkAllMaps(all_map)
+     
 
 if __name__ == "__main__":
     BuildMapData()
