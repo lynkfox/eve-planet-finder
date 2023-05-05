@@ -2,11 +2,14 @@ from models.common import *
 import models.mapv2 as mapData
 from data.planetaryResources import *
 import yaml
-from typing import Any
+from typing import Any, Dict, List
 import codecs
 from time import perf_counter
 from pickle import dump, load
 from math import floor
+from functools import cached_property
+import numpy
+from dataclasses import dataclass, field
 
 DECIMAL_FORMAT = "{:.3f}"
 
@@ -82,7 +85,6 @@ class AllData():
                 setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
                  
         print("Data Loaded")
-
 
 def BuildMapData(client: mapData.MapClient):
     first_start = perf_counter()

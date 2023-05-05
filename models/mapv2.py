@@ -214,7 +214,7 @@ class System(iStaticDataExport):
         if properties is not None:
             self.Name = properties["name"]
             self.Id = properties["system_id"]
-            self.Planet_Ids = properties.get("planets", []) 
+            self.Planet_Ids = [celestial.get("planet_id", None) for celestial in properties.get("planets", {}) if celestial.get("planet_id", None) is not None]
             self.Stargate_Ids = properties.get("stargates", [])
             self.Security_Status = properties["security_status"]
             self.Constellation_Id = properties["constellation_id"]
