@@ -22,7 +22,7 @@ class WeightCalculator():
     WeightFactors: iWeightFactor
     MaxJumps:int = field(kw_only=True, default=3)
     CACHE_EXPENSIVE_CALLS: bool = field(kw_only=True, default=False)
-    _systemIdsAlreadySearched: Dict[int, int] = field(init=False, default_factory=list)
+    _systemIdsAlreadySearched: Dict[int, int] = field(init=False, default_factory=dict)
     """
         _systemIdsAlreadySearched is a dict of SystemId: JumpsFromSource. This allows finding an already searched system 
             that is less jumps away from the origin than currently remembered.
@@ -45,10 +45,11 @@ class WeightCalculator():
         :return results(Dict[int, int]): a dictionary of SystemIds and their weights.
         """
         # clear the results
-        self._results = []
+        self._results = {}
+        self._systemIdsAlreadySearched = {}
 
         # weigh the origin system with None as Previous and 0 as current_jumps
-        self._checkNextSystem(self, origin_system, None, 0)
+        self._checkNextSystem(origin_system, None, 0)
 
         match method:
             case WeightMethod.AVERAGE:
@@ -75,7 +76,7 @@ class WeightCalculator():
             return
         
         # if the system has already been searched AND the total jumps to get from origin to here by another path is less than this path, cut out
-        if target_sys.Id in self._systemIdsAlreadySearched.Keys() and self._systemIdsAlreadySearched[target_sys.Id] < current_jumps:
+        if target_sys.Id in self._systemIdsAlreadySearched.keys() and self._systemIdsAlreadySearched[target_sys.Id] < current_jumps:
             return
         
         # save the current jumps to get to this path for the above
@@ -93,7 +94,7 @@ class WeightCalculator():
                 continue
             
             # repeat all of the above, shifting target_sys to the previous and incrementing the jump counter.
-            self._checkNextSystem(new_target_system, target_sys.id, current_jumps+1)
+            self._checkNextSystem(new_target_system, target_sys.Id, current_jumps+1)
 
         return
             
