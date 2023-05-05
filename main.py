@@ -1,7 +1,10 @@
-from data.calculated_values import CalculatedMapData
-
+from calculate.full_map_values import CalculatedMapData
+from buildMapData import AllData
 
 
 if __name__ == "__main__":
-    derived_data = CalculatedMapData()
+    data = AllData(skip_build=True)
+    
+
+    # derived_data = CalculatedMapData()
     print("wee")

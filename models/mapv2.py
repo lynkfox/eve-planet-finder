@@ -69,6 +69,8 @@ class Commodity(iStaticDataExport):
 
     
     def GetIngredients(self, cache:bool=False) -> List[Commodity]:
+        if hasattr(self, "Ingredients"):
+            return self.Ingredients
         ingredients = [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
         if cache:
             self.Ingredients = ingredients
@@ -136,12 +138,16 @@ class Planet(iStaticDataExport):
         return self.GetType().RawResources_Names
 
     def GetType(self, cache:bool=False) -> PlanetType:
+        if hasattr(self, "Type"):
+            return self.Type
         planet_type = next((pt for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
         if cache:
             self.Type = planet_type
         return planet_type
 
     def GetSystem(self, cache:bool=False) -> System:
+        if hasattr(self, "System"):
+            return self.System
         system = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.System_Id), None)
         if cache:
             self.System = system
@@ -157,6 +163,7 @@ class Planet(iStaticDataExport):
 @dataclass
 class Stargate(iStaticDataExport):
     DestinationSystem_Id: int = field(kw_only=True, default=0)
+    DestinationName: str = field(kw_only=True, default="")
     OriginSystem_Id: int = field(kw_only=True, default=0)
 
     def __post_init__(self, properties: Dict[str, Any]):
@@ -165,6 +172,7 @@ class Stargate(iStaticDataExport):
             self.Id = properties["stargate_id"]
             self.OriginSystem_Id = properties["system_id"]
             self.DestinationSystem_Id = properties["destination"]["system_id"]
+            self.DestinationSystem_Name = self.Name.replace("Stargate (", "")[:-1]
 
             self.client.ALL_STARGATES.append(self)
     
@@ -185,22 +193,26 @@ class Stargate(iStaticDataExport):
         return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
 
     def GetDestinationSystem(self, cache:bool=False)-> System:
+        if hasattr(self, "Destination"):
+            return self.Destination
         destination =  next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
         if cache:
             self.Destination = destination
         return destination
 
     def GetOriginSystem(self, cache:bool=False)-> System:
-        destination =  next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+        if hasattr(self, "Origin"):
+            return self.Origin
+        origin = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
         if cache:
-            self.Origin = destination
-        return destination
+            self.Origin = origin
+        return origin
 
     def __getstate__(self):
-        return (self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id)
+        return (self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name)
 
     def __setstate__(self, state):
-        self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id = state
+        self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name = state
 
 @dataclass
 class System(iStaticDataExport):
@@ -243,13 +255,19 @@ class System(iStaticDataExport):
 
     @cached_property
     def Planet_Names(self)->List[str]:
-        return [planet.name for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
+        return [planet.Name for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
+    
+    @cached_property
+    def PlanetTypes_Ids(self)->List[int]:
+        return [planet.Type_Id for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
 
     @cached_property
     def Constellation_Name(self) -> int:
         return next((constellation.Name for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
 
     def GetStargates(self, cache:bool=False)-> List[Stargate]:
+        if hasattr(self, "Stargates"):
+            return self.Stargates
         stargates = [sg for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
         if cache:
             self.Stargates = stargates
@@ -263,12 +281,16 @@ class System(iStaticDataExport):
         return systems
         
     def GetPlanets(self, cache: bool=False) -> List[Planet]:
+        if hasattr(self, "Planets"):
+            return self.Planets
         planets = [planet for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
         if cache:
             self.Planets=planets
         return planets
 
     def GetConstellation(self, cache: bool=False)-> Constellation:
+        if hasattr(self, "Constellation"):
+            return self.Constellation
         constellation = next((constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
         if cache:
             self.Constellation = constellation
@@ -317,12 +339,16 @@ class Constellation (iStaticDataExport):
         return [sys.Name for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
 
     def GetRegion(self, cache:bool=False)->Region:
+        if hasattr(self, "Region"):
+            return self.Region
         region = next((region for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
         if cache:
             self.Region = region
         return region
 
     def GetSystems(self, cache:bool=False)->List[System]:
+        if hasattr(self, "Systems"):
+            return self.Systems
         systems = [sys for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
         if cache:
             self.Systems = systems
@@ -354,6 +380,8 @@ class Region (iStaticDataExport):
         return next((constellation.Name for constellation in self.client.ALL_CONSTELLATIONS if self.Id == constellation.Region_id), None)
 
     def GetConstellations(self, cache:bool=False)->List[Constellation]:
+        if hasattr(self, "Constellations"):
+            return self.Constellations
         constellations = [constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id == constellation.Region_id]
         if cache:
             self.Constellations = constellations
