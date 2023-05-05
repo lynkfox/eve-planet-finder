@@ -21,39 +21,47 @@ data_files = {
     "data/planetSchematics.yaml": mapData.Commodity,
 }
 
+
+
+
 def LoadYaml(file_name: str)->Any:
     with codecs.open(file_name, 'r', encoding='utf-8', errors='ignore') as fdata:
         return yaml.safe_load(fdata)
 
-def CreateMaps(data, obj) -> dict:
+def CreateMaps(data, obj, client) -> dict:
+    if isinstance(data, list):
+        for item in list:
+            obj(properties=item, client=client)
+    else:
+        for value in data.values():
+            obj(properties=value, client=client)
 
-    tick = floor(len(data)/240)
-    tock = 0
-    for index in data:
-        tock +=1
-        obj(properties=data[index])
-        if tick%tock == 0 :
-            print(".", end="")
     
     
 
 class AllData():
-    def __init__(self) -> None:
-        BuildMapData()
-        self.SetAllData()
-
-    def SetAllData(self):
-        self.Commodities = mapData.ALL_COMMODITIES
-        self.Planet_Types = mapData.ALL_PLANET_TYPES
-        self.Planets = mapData.ALL_PLANETS
-        self.Stargates = mapData.ALL_STARGATES
-        self.Systems = mapData.ALL_SYSTEMS
-        self.Constellations = mapData.ALL_CONSTELLATIONS
-        self.Regions = mapData.ALL_REGIONS
-
+    def __init__(self, skip_build:bool=False) -> None:
+        self.MapClient = mapData.MapClient()
         self.PickleAttributes = [
             "Commodities", "Planet_Types", "Planets", "Stargates", "Systems", "Constellations", "Regions"
         ]
+        if skip_build:
+            self.PopulateFromPickles()
+        else:
+            BuildMapData(self.MapClient)
+
+        self.SetAllData()
+
+    def SetAllData(self):
+        self.Commodities = self.MapClient.ALL_COMMODITIES
+        self.Planet_Types = self.MapClient.ALL_PLANET_TYPES
+        self.Planets = self.MapClient.ALL_PLANETS
+        self.Stargates = self.MapClient.ALL_STARGATES
+        self.Systems = self.MapClient.ALL_SYSTEMS
+        self.Constellations = self.MapClient.ALL_CONSTELLATIONS
+        self.Regions = self.MapClient.ALL_REGIONS
+
+        
 
     def PickleAll(self):
         print("Picking Data")
@@ -64,34 +72,41 @@ class AllData():
         print("Data Pickled")
 
     def PopulateFromPickles(self):
- 
         print("Loading Pickled Data")
         for attribute in self.PickleAttributes:
-            with open(f"data/pickled_{attribute.lower()}", "rb") as pickleFile:
-                 setattr(mapData, attribute.upper(), load(pickleFile))
+            pickle_file_path = f"data/pickled_{attribute.lower()}"
+            with open(pickle_file_path, "rb") as pickleFile:
+                un_pickled_data=load(pickleFile)
+                for item in un_pickled_data:
+                    item.client=self.MapClient
+                setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
+                 
         print("Data Loaded")
 
 
-def BuildMapData():
-    start = perf_counter()
+def BuildMapData(client: mapData.MapClient):
+    first_start = perf_counter()
     for key, value in data_files.items():
-        print(f"Processing {key}")
+        print(f"\n==== Processing {key} =====")
         start = perf_counter()
         yamlFile = LoadYaml(key)
-        print(f"{key} loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+        print(f"\t> {DECIMAL_FORMAT.format(perf_counter()-start)} seconds to load yaml file")
 
         start = perf_counter()
-        CreateMaps(yamlFile, value)
-        print(f"\n{len(yamlFile)} {key} entries converted in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+        CreateMaps(yamlFile, value, client)
+        print(f"\t> {DECIMAL_FORMAT.format(perf_counter()-start)} seconds to convert {len(yamlFile)} entries")
 
-    CreateMaps(RawResources, mapData.Commodity)
+    for value in RawResources:
+        mapData.Commodity(properties=value, client=client)
+
+    print(f"{DECIMAL_FORMAT.format(perf_counter()-first_start)} total run time.")
     
 
      
 
 if __name__ == "__main__":
-    AllData()
-    AllData.PickleAll()
+    data = AllData()
+    data.PickleAll()
 
     
 

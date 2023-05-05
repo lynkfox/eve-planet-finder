@@ -6,20 +6,26 @@ from models.common import Position, Universe
 from data.planetaryResources import RAW_RESOURCE_TO_TYPE
 import re
 
-ALL_COMMODITIES: List[Commodity] = []
-ALL_PLANET_TYPES: List[PlanetType] = []
-ALL_PLANETS: List[Planet] = []
-ALL_STARGATES: List[Stargate] = []
-ALL_SYSTEMS: List[System] = []
-ALL_CONSTELLATIONS: List[Constellation] = []
-ALL_REGIONS: List[Region] = []
 MISSING = "ThisValueIsMissing"
+@dataclass
+class MapClient():
+    ALL_COMMODITIES: List[Commodity] = field(init=False, default_factory=list)
+    ALL_PLANET_TYPES: List[PlanetType] = field(init=False, default_factory=list)
+    ALL_PLANETS: List[Planet] = field(init=False, default_factory=list)
+    ALL_STARGATES: List[Stargate] = field(init=False, default_factory=list)
+    ALL_SYSTEMS: List[System] = field(init=False, default_factory=list)
+    ALL_CONSTELLATIONS: List[Constellation] = field(init=False, default_factory=list)
+    ALL_REGIONS: List[Region] = field(init=False, default_factory=list)
+
+
 
 @dataclass
 class iStaticDataExport():
     properties: InitVar[Dict[str, Any]]
+    client: MapClient = field(init=True)
     Name: str = field(kw_only=True, default=None)
     Id: int = field(kw_only=True, default=0)
+    
 
     def __hash__(self):
         return hash(self.Name, self.Id)
@@ -55,15 +61,15 @@ class Commodity(iStaticDataExport):
                 else:
                     self.Id = resourceID
 
-        ALL_COMMODITIES.append(self)
+        self.client.ALL_COMMODITIES.append(self)
     
     @cached_property
     def Ingredient_Names(self) -> List[str]:
-        return [ingredient.Name for ingredient in ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+        return [ingredient.Name for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
 
     
     def GetIngredients(self, cache:bool=False) -> List[Commodity]:
-        ingredients = [ingredient for ingredient in ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+        ingredients = [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
         if cache:
             self.Ingredients = ingredients
         return ingredients
@@ -83,10 +89,10 @@ class PlanetType(iStaticDataExport):
 
     def __post_init__(self, properties: Dict[str, Any]):
         if properties is not None:
-            self.Name = properties["nameID"]
+            self.Name = properties["name"].replace("Planet", "").replace("(", "").replace(")", "").strip()
             self.Id = properties["type_id"]
 
-        ALL_PLANET_TYPES.append(self)
+        self.client.ALL_PLANET_TYPES.append(self)
 
     @cached_property
     def RawResources_Ids(self) -> List[int]:
@@ -94,11 +100,11 @@ class PlanetType(iStaticDataExport):
     
     @cached_property
     def RawResources_Names(self)->List[Commodity]:
-        return [ingredient.Name for ingredient in ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
+        return [ingredient.Name for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
             
     @cached_property
     def RawResources(self)->List[Commodity]:
-        return [ingredient for ingredient in ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
+        return [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
     
     
 
@@ -114,12 +120,12 @@ class Planet(iStaticDataExport):
             self.System_Id = properties["system_id"]
             self.Type_Id = properties["type_id"] 
 
-        ALL_PLANETS.append(self)
+        self.client.ALL_PLANETS.append(self)
 
     
     @cached_property
     def Type_Name(self)->str:
-        return next((pt.Name for pt in ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
+        return next((pt.Name for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
 
     @cached_property
     def RawResource_Ids(self)-> List[int]:
@@ -130,13 +136,13 @@ class Planet(iStaticDataExport):
         return self.GetType().RawResources_Names
 
     def GetType(self, cache:bool=False) -> PlanetType:
-        planet_type = next((pt for pt in ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
+        planet_type = next((pt for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
         if cache:
             self.Type = planet_type
         return planet_type
 
     def GetSystem(self, cache:bool=False) -> System:
-        system = next((sys for sys in ALL_SYSTEMS if sys.Id == self.System_Id), None)
+        system = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.System_Id), None)
         if cache:
             self.System = system
         return system
@@ -160,32 +166,32 @@ class Stargate(iStaticDataExport):
             self.OriginSystem_Id = properties["system_id"]
             self.DestinationSystem_Id = properties["destination"]["system_id"]
 
-            ALL_STARGATES.append(self)
+            self.client.ALL_STARGATES.append(self)
     
     @cached_property
     def DestinationSystem_Name(self) -> str:
-        return next((sys.Name for sys in ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+        return next((sys.Name for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
 
     @cached_property
     def DestinationSystem_Position(self)-> Position:
-        return next((sys.Position for sys in ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+        return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
     
     @cached_property
     def OriginSystem_Name(self)->str:
-        return next((sys.Name for sys in ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+        return next((sys.Name for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
 
     @cached_property
     def OriginSystem_Position(self)-> Position:
-        return next((sys.Position for sys in ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+        return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
 
     def GetDestinationSystem(self, cache:bool=False)-> System:
-        destination =  next((sys for sys in ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+        destination =  next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
         if cache:
             self.Destination = destination
         return destination
 
     def GetOriginSystem(self, cache:bool=False)-> System:
-        destination =  next((sys for sys in ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+        destination =  next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
         if cache:
             self.Origin = destination
         return destination
@@ -201,7 +207,7 @@ class System(iStaticDataExport):
     Position: Position = field(kw_only=True, default=None)
     Security_Status: float = field(kw_only=True, default=1.0)
     Planet_Ids: List[int] = field(kw_only=True, default_factory=list)
-    LinkedSystem_Ids: List[int] = field(kw_only=True, default_factory=list)
+    Stargate_Ids: List[int] = field(kw_only=True, default_factory=list)
     Constellation_Id: int = field(kw_only=True, default=0)
 
     def __post_init__(self, properties: Dict[str, Any]):
@@ -209,7 +215,7 @@ class System(iStaticDataExport):
             self.Name = properties["name"]
             self.Id = properties["system_id"]
             self.Planet_Ids = properties.get("planets", []) 
-            self.LinkedSystem_Ids = properties.get("stargates", [])
+            self.Stargate_Ids = properties.get("stargates", [])
             self.Security_Status = properties["security_status"]
             self.Constellation_Id = properties["constellation_id"]
 
@@ -220,45 +226,59 @@ class System(iStaticDataExport):
                 Universe=Universe.WORMHOLE if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"]) else Universe.EDEN
             )
 
-        if re.match(r"AD\d{3}$", self.Name) is not None or re.match(r"V-(\d{3})$", self.Name) is not None:
-            ALL_SYSTEMS.append(self)
+        if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
+            self.client.ALL_SYSTEMS.append(self)
+
+    @cached_property
+    def Stargate_Names(self)->List[str]:
+        return [sg.Name for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
 
     @cached_property
     def LinkedSystem_Names(self)->List[str]:
-        return [sys.name for sys in ALL_SYSTEMS if sys.id in self.LinkedSystem_Ids]
+        return [sg_name.replace("Stargate (", "")[:-1] for sg_name in self.Stargate_Names]
+
+    @cached_property
+    def LinkedSystem_Ids(self)->List[int]:
+        return [sys.Id for sys in self.client.ALL_SYSTEMS if sys.Name in self.LinkedSystem_Names]
 
     @cached_property
     def Planet_Names(self)->List[str]:
-        return [planet.name for planet in ALL_PLANETS if planet.id in self.Planet_Ids]
+        return [planet.name for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
 
     @cached_property
     def Constellation_Name(self) -> int:
-        return next((constellation.Name for constellation in ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
+        return next((constellation.Name for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
+
+    def GetStargates(self, cache:bool=False)-> List[Stargate]:
+        stargates = [sg for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
+        if cache:
+            self.Stargates = stargates
+        return stargates
     
     def GetLinkedSystems(self, cache:bool=False) -> List[System]:
-        systems =  [sys for sys in ALL_SYSTEMS if sys.id in self.LinkedSystem_Ids]
+        systems =  [sys for sys in self.client.ALL_SYSTEMS if sys.Id in self.LinkedSystem_Ids]
         if cache:
             self.Systems = systems
         
         return systems
         
     def GetPlanets(self, cache: bool=False) -> List[Planet]:
-        planets = [planet for planet in ALL_PLANETS if planet.id in self.Planet_Ids]
+        planets = [planet for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
         if cache:
             self.Planets=planets
         return planets
 
     def GetConstellation(self, cache: bool=False)-> Constellation:
-        constellation = next((constellation for constellation in ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
+        constellation = next((constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
         if cache:
             self.Constellation = constellation
         return constellation
     
     def __getstate__(self):
-        return (self.Name, self.Id, self.Planet_Ids, self.LinkedSystem_Ids, self.Security_Status, self.Position, self.Constellation_Id)
+        return (self.Name, self.Id, self.Planet_Ids, self.Stargate_Ids, self.Security_Status, self.Position, self.Constellation_Id)
 
     def __setstate__(self, state):
-        self.Name, self.Id, self.Planet_Ids, self.LinkedSystem_Ids, self.Security_Status, self.Position, self.Constellation_Id  = state
+        self.Name, self.Id, self.Planet_Ids, self.Stargate_Ids, self.Security_Status, self.Position, self.Constellation_Id  = state
 
 
 @dataclass
@@ -281,29 +301,29 @@ class Constellation (iStaticDataExport):
                 Universe=Universe.EDEN
             )
 
-        if re.match(r"ADC\d{2}", self.Name) is not None or re.match(r"VC-\d{3}", self.Name) is not None:
-            ALL_CONSTELLATIONS.append(self)
+        if re.match(r"ADC\d{2}", self.Name) is None and re.match(r"VC-\d{3}", self.Name) is None:
+            self.client.ALL_CONSTELLATIONS.append(self)
 
     @cached_property
     def Region_Name(self)->str:
-        return next((region.Name for region in ALL_REGIONS if self.id in region.Constellation_Ids), None)
+        return next((region.Name for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
 
     @cached_property
     def System_Ids(self)->List[int]:
-        return [sys.id for sys in ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+        return [sys.Id for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
 
     @cached_property
     def System_Names(self)->List[str]:
-        return [sys.Name for sys in ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+        return [sys.Name for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
 
     def GetRegion(self, cache:bool=False)->Region:
-        region = next((region for region in ALL_REGIONS if self.id in region.Constellation_Ids), None)
+        region = next((region for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
         if cache:
             self.Region = region
         return region
 
     def GetSystems(self, cache:bool=False)->List[System]:
-        systems = [sys for sys in ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+        systems = [sys for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
         if cache:
             self.Systems = systems
         
@@ -326,21 +346,21 @@ class Region (iStaticDataExport):
             self.Constellation_Ids = properties.get("constellations", [])
 
 
-        if re.match(r"ADR\d{2}", self.Name) is not None or re.match(r"VR-\d{2}", self.Name) is not None:
-            ALL_REGIONS.append(self)
+        if re.match(r"ADR\d{2}", self.Name) is None and re.match(r"VR-\d{2}", self.Name) is None:
+            self.client.ALL_REGIONS.append(self)
 
     @cached_property
     def Constellation_Name(self)-> str:
-        return next((constellation.Name for constellation in ALL_CONSTELLATIONS if self.Id == constellation.Region_id), None)
+        return next((constellation.Name for constellation in self.client.ALL_CONSTELLATIONS if self.Id == constellation.Region_id), None)
 
     def GetConstellations(self, cache:bool=False)->List[Constellation]:
-        constellations = [constellation for constellation in ALL_CONSTELLATIONS if self.Id == constellation.Region_id]
+        constellations = [constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id == constellation.Region_id]
         if cache:
             self.Constellations = constellations
         return constellations
 
     def __getstate__(self):
-        return (self.Name, self.Id, self.Constellation_Ids, self.Position)
+        return (self.Name, self.Id, self.Constellation_Ids)
 
     def __setstate__(self, state):
-        self.Name, self.Id, self.Constellation_Ids, self.Position  = state
+        self.Name, self.Id, self.Constellation_Ids  = state
