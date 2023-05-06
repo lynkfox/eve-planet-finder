@@ -3,6 +3,7 @@ from dataclasses import dataclass, field, InitVar
 from typing import Any, Dict, List
 from functools import cached_property
 from models.common import Position, Universe
+from data.planetaryResources import *
 from data.planetaryResources import RAW_RESOURCE_TO_TYPE
 import re
 
@@ -48,7 +49,7 @@ class iStaticDataExport():
 @dataclass
 class Commodity(iStaticDataExport):
 
-    Tier: int = field(kw_only=True, default=1)
+    Tier: int = field(kw_only=True, default=0)
     Ingredient_Ids: List[int] = field(kw_only=True, default_factory=list)
 
 
@@ -60,6 +61,8 @@ class Commodity(iStaticDataExport):
                     self.Ingredient_Ids.append(resourceID)
                 else:
                     self.Id = resourceID
+
+            self._determineTier()
 
         self.client.ALL_COMMODITIES.append(self)
     
@@ -75,6 +78,63 @@ class Commodity(iStaticDataExport):
         if cache:
             self.Ingredients = ingredients
         return ingredients
+
+    def GetRawResourceIds(self, cache:bool=False):
+
+        if hasattr(self, "RawResource_Ids") and len(self.RawResource_Ids) > 0:
+            return self.RawResource_Ids
+        else:
+            self.RawResource_Ids = []
+        
+        temp = []
+
+        for ingredient in self.GetIngredients(cache=cache):
+            if ingredient.Tier > 0:
+                temp.append(ingredient.GetRawResourceIds(cache=cache))
+            else:
+                return ingredient.Id
+        
+        if cache:
+            self.RawResource_Ids = temp
+
+        return temp
+
+    def GetRawResource(self, cache:bool=False):
+        if hasattr(self, "RawResources") and len(self.RawResources) > 0:
+            return self.RawResources
+        else:
+            self.RawResources = []
+
+        if hasattr(self.RawResource_Ids) and len(self.RawResource_Ids) > 0:
+            return [commodity for commodity in self.client.ALL_COMMODITIES if commodity.Id in self.RawResource_Ids]
+
+        
+        temp = []
+
+        for ingredient in self.GetIngredients(cache=cache):
+            if ingredient.Tier > 0:
+                temp.extend(ingredient.GetRawResources(cache=cache))
+            else:
+                return [ingredient]
+        
+        if cache:
+            self.RawResources = temp
+
+        return temp
+
+
+
+    def _determineTier(self):
+        
+        if self.Name in AdvancedCommodities:
+            self.Tier = 4
+        if self.Name in SpecializedCommodities:
+            self.Tier = 3
+        if self.Name in RefinedCommodities:
+            self.Tier = 2
+        if self.Name in BasicCommodities:
+            self.Tier = 1
+        
 
     def __repr__(self) -> str:
         return f"Commodity( Name={self.Name}, Id={self.Id}, Tier={self.Tier}, Ingredients={self.IngredientNames} )"
