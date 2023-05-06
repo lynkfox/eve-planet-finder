@@ -79,7 +79,7 @@ class Commodity(iStaticDataExport):
             self.Ingredients = ingredients
         return ingredients
 
-    def GetRawResourceIds(self, cache:bool=False):
+    def GetRawResourceIds(self, cache:bool=False)->List[int]:
 
         if hasattr(self, "RawResource_Ids") and len(self.RawResource_Ids) > 0:
             return self.RawResource_Ids
@@ -90,16 +90,16 @@ class Commodity(iStaticDataExport):
 
         for ingredient in self.GetIngredients(cache=cache):
             if ingredient.Tier > 0:
-                temp.append(ingredient.GetRawResourceIds(cache=cache))
+                temp.extend(ingredient.GetRawResourceIds(cache=cache))
             else:
-                return ingredient.Id
+                return [ingredient.Id]
         
         if cache:
             self.RawResource_Ids = temp
 
         return temp
 
-    def GetRawResource(self, cache:bool=False):
+    def GetRawResources(self, cache:bool=False) -> List[Commodity]:
         if hasattr(self, "RawResources") and len(self.RawResources) > 0:
             return self.RawResources
         else:
@@ -158,7 +158,7 @@ class PlanetType(iStaticDataExport):
 
     @cached_property
     def RawResources_Ids(self) -> List[int]:
-        return [key for key, value in RAW_RESOURCE_TO_TYPE if self.Id in value]
+        return [key for key, value in RAW_RESOURCE_TO_TYPE.items() if self.Id in value]
     
     @cached_property
     def RawResources_Names(self)->List[Commodity]:
@@ -291,6 +291,10 @@ class System(iStaticDataExport):
             self.Security_Status = properties["security_status"]
             self.Constellation_Id = properties["constellation_id"]
 
+            # non accessible constellation, so dont add this system to the general list 
+            if self.Constellation_Id == 20000062:
+                return
+
             self.Position = Position(
                 X=properties["position"]["x"],
                 Y=properties["position"]["y"],
@@ -375,6 +379,10 @@ class Constellation (iStaticDataExport):
             self.Id = properties["constellation_id"]
             self.System_Ids = properties.get("systems", []) 
             self.Region_Id = properties["region_id"]
+
+            # non accessible constellation 
+            if self.Id == 20000062:
+                return
 
             self.Position = Position(
                 X=properties["position"]["x"],

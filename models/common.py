@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+
+DECIMAL_FORMAT = "{:.3f}"
 
 class Universe(Enum):
     EDEN=1
@@ -29,6 +31,7 @@ class iWeightFactor():
     Child classes should include anything in their attributes that is used in weight calculation that remains constant and doesn't change when moving
     to another node.
     """
+    
 
     
     def DetermineSystemWeight(self, system, jumps_from_source):
@@ -43,3 +46,14 @@ class iWeightFactor():
         raise NotImplementedError
 
 
+@dataclass
+class iWeightResult():
+    """ interface for Weight Results in the Weight Calculator"""
+    WeightFactors: iWeightFactor = field(init=True)
+    SortValue: int = field(init=False)
+
+    def Populate(self, current_system, origin_system, jumps_from_source:int, weight:float ):
+        """ Method to populate the details of the Child WeightResult class
+        must return Self
+        """
+        raise NotImplementedError

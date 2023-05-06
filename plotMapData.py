@@ -1,15 +1,26 @@
 from buildMapData import *
-from models.common import Universe
+from models.common import Universe, WeightMethod, DECIMAL_FORMAT
 from models.mapv2 import *
-#from calculateCloseness import *
+from calculate.search_map import WeightCalculator
+from calculate.planetary_industry import PlanetaryIndustryWeightFactor, PlanetaryIndustryResult
+from itertools import chain
 
 import plotly.graph_objects as go
 import networkx as nx
+from time import perf_counter
+from alive_progress import alive_bar
 
 POSITION_RELATIVE=1
 
 INCLUDE_PLANET_NAMES = False
 
+COMMODITY_TO_TRACK = "Integrity Response Drones"
+
+USE_CACHE = True
+
+WEIGHTING_METHOD = WeightMethod.AVERAGE
+
+DISPLAY_RESULTS = True
 class GraphValues():
     def __init__(self) -> None:
         self.node_x = []
@@ -26,56 +37,61 @@ class GraphValues():
 def DisplayMap():
     all_data = AllData(skip_build=True)
 
-    #systemWeights = CalculateCloseness(RawResourcesDesired, 1, all_data)
+    raw_resource_ids = next(commodity for commodity in all_data.Commodities if commodity.Name == COMMODITY_TO_TRACK).GetRawResourceIds(cache=USE_CACHE)
 
     systemMap = nx.Graph()
 
-    not_done_flag = True
-    display_results = not not_done_flag
+    
+
+    calculator = WeightCalculator(
+        WeightFactors=PlanetaryIndustryWeightFactor(
+            PlanetTypesDesired=[ptype.Id for ptype in all_data.Planet_Types if len(set(ptype.RawResources_Ids).intersection(set(raw_resource_ids))) > 0]
+        ),
+        WeightResults=PlanetaryIndustryResult,
+        MaxJumps=5
+    )
 
     graph_values=GraphValues()
     
-    for system in all_data.Systems:
+    start = perf_counter()
+    counter = 0
 
-        if system.Position.Universe == Universe.WORMHOLE:
-            continue
+    with alive_bar( all_data.TotalEdenSystems, title_length=40 ) as bar:
 
-        if len(system.Stargate_Ids) == 0:
-            continue
-
-        systemMap.add_node(system.Name)
-        graph_values.node_names.append(system.Name)
-        graph_values.node_x.append(system.Position.X/POSITION_RELATIVE)
-        graph_values.node_y.append(system.Position.Y/POSITION_RELATIVE)
-        # weight = systemWeights[system.Id].TotalWeight
-        # if weight == 1220 and not_done_flag:
-        #     for pot_site in systemWeights[system.Id].PotentialSites:
-        #         for entry in pot_site.Audit:
-        #             print(entry)
-        #     not_done_flag=False
-        # if weight > top_weight:
-        #     top_weight = weight
-        #     top_system = [system.Name]
-        #     top_values = {system.Name: systemWeights[system.Id].PotentialSites}
-
-        # elif weight == top_weight:
-        #     top_system.append(system.Name)
-        #     top_values = {**top_values, **{system.Name: systemWeights[system.Id].PotentialSites}}
-
-        # graph_values.node_weight.append(weight)
-        graph_values.node_text.append(f"{system.Name}")
+        for system in all_data.Systems:
 
 
-        for destination in system.GetLinkedSystems():
-            systemMap.add_edge(system.Name, destination.Name)
-            graph_values.edge_x.append(system.Position.X/POSITION_RELATIVE)
-            graph_values.edge_x.append(destination.Position.X/POSITION_RELATIVE)
-            graph_values.edge_x.append(None)
-            graph_values.edge_y.append(system.Position.Y/POSITION_RELATIVE)
-            graph_values.edge_y.append(destination.Position.Y/POSITION_RELATIVE)
-            graph_values.edge_y.append(None)
+            if system.Position.Universe == Universe.WORMHOLE:
+                continue
+
+            if len(system.Stargate_Ids) == 0:
+                continue
+
+            bar.title(f'Analyzing "{system.Constellation_Name}" in the "{system.GetConstellation().Region_Name}" Region')
+
+
+            system_weight, _ = calculator.Run(system, method=WEIGHTING_METHOD)
+            
+
+            systemMap.add_node(system.Name)
+            graph_values.node_names.append(system.Name)
+            graph_values.node_x.append(system.Position.X/POSITION_RELATIVE)
+            graph_values.node_y.append(system.Position.Y/POSITION_RELATIVE)
+
+            graph_values.node_weight.append(system_weight)
+            graph_values.node_text.append(f"{system.Name} - {system_weight}")
+
+            for destination in system.GetLinkedSystems():
+                systemMap.add_edge(system.Name, destination.Name)
+                graph_values.edge_x.append(system.Position.X/POSITION_RELATIVE)
+                graph_values.edge_x.append(destination.Position.X/POSITION_RELATIVE)
+                graph_values.edge_x.append(None)
+                graph_values.edge_y.append(system.Position.Y/POSITION_RELATIVE)
+                graph_values.edge_y.append(destination.Position.Y/POSITION_RELATIVE)
+                graph_values.edge_y.append(None)
+            
+            bar()
         
-
 
 
     edge_trace = go.Scatter(
@@ -112,18 +128,17 @@ def DisplayMap():
     node_trace.marker.color = graph_values.node_weight
     node_trace.text = graph_values.node_text
 
-    top_system =""
-    top_weight = ""
+    top_system = [all_data.GetSystem(key).Name for key in calculator.TopDetails.keys()]
+    top_weight = calculator.TopWeight
 
     fig = go.Figure(data=[edge_trace, node_trace],
              layout=go.Layout(
-                title=f'<br>Eve Online System Map - Weighted by Closeness for all PI for Integrity Response Drones<br>{top_system} with weight of {top_weight}',
+                title=f'<br>Eve Online System Map - Weighted by Closeness for all PI for {COMMODITY_TO_TRACK}<br>{top_system} with weight of {top_weight}',
                 titlefont_size=16,
                 showlegend=False,
                 hovermode='closest',
                 margin=dict(b=20,l=5,r=5,t=40),
                 annotations=[ dict(
-                    text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
                     showarrow=False,
                     xref="paper", yref="paper",
                     x=0.005, y=-0.002 ) ],
@@ -134,22 +149,14 @@ def DisplayMap():
 
     
 
-    # if display_results:
-    #     print(f"=======Top Systems=======")
-    #     print(f"     {top_system}")
-    #     print(f"Closest Systems:")
-    #     for key, source_system in top_values.items():
-    #         systems = sorted(source_system, key=lambda d: d.JumpsFromSource)
-
-    #         for sys in systems:
-    #             print(f"\n>>>>>__________ {key} __________<<<<<<")
-    #             print(f"\t- Jumps away:                {sys.JumpsFromSource}")
-    #             planet_types = " | ".join([key for key in sys.Planets.keys() if key!= "PlanetNames"])
-    #             print(f"\t- Planet Types Available:    {planet_types}")
-    #             if INCLUDE_PLANET_NAMES:
-    #                 for planetInfo in sys.Planets.values():
-    #                     print(f"\t\t== {planetInfo.Type}")
-    #                     print(f"\t\t --> {', '.join(planetInfo.Names)}")
+    if DISPLAY_RESULTS:
+        print(f"=======Top Systems=======")
+        print(f"     {top_system}")
+        
+        for key, value in calculator.TopDetails.items():
+            print(all_data.GetSystem(key).Name)
+            for entry in value.values():
+                print(entry)
 
 
 

@@ -2,16 +2,13 @@ from models.common import *
 import models.mapv2 as mapData
 from data.planetaryResources import *
 import yaml
-from typing import Any, Dict, List
+from typing import Any, Union
 import codecs
 from time import perf_counter
 from pickle import dump, load
-from math import floor
+from alive_progress import alive_bar
 from functools import cached_property
-import numpy
-from dataclasses import dataclass, field
 
-DECIMAL_FORMAT = "{:.3f}"
 
 
 data_files = {
@@ -64,7 +61,52 @@ class AllData():
         self.Constellations = self.MapClient.ALL_CONSTELLATIONS
         self.Regions = self.MapClient.ALL_REGIONS
 
+    def GetCommodity(self, value:Union[str, int])->mapData.Commodity:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Commodities if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Commodities if commodity.Id == value)
         
+    def GetPlanetType(self, value:Union[str, int])->mapData.PlanetType:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.PlanetTypes if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.PlanetTypes if commodity.Id == value)
+
+    def GetPlanet(self, value:Union[str, int])->mapData.Planet:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Planets if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Planets if commodity.Id == value)
+
+    def GetStargate(self, value:Union[str, int])->mapData.Stargate:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Stargates if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Stargates if commodity.Id == value)
+
+    def GetSystem(self, value:Union[str, int])->mapData.System:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Systems if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Systems if commodity.Id == value)
+    
+    def GetConstellation(self, value:Union[str, int])->mapData.Constellation:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Constellations if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Constellations if commodity.Id == value)
+    
+    def GetRegion(self, value:Union[str, int])->mapData.Region:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Regions if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Regions if commodity.Id == value)
+        
+    @cached_property
+    def TotalEdenSystems(self)->int:
+        return len([sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN])
+
 
     def PickleAll(self):
         print("Picking Data")
@@ -87,21 +129,17 @@ class AllData():
         print("Data Loaded")
 
 def BuildMapData(client: mapData.MapClient):
-    first_start = perf_counter()
-    for key, value in data_files.items():
-        print(f"\n==== Processing {key} =====")
-        start = perf_counter()
-        yamlFile = LoadYaml(key)
-        print(f"\t> {DECIMAL_FORMAT.format(perf_counter()-start)} seconds to load yaml file")
 
-        start = perf_counter()
-        CreateMaps(yamlFile, value, client)
-        print(f"\t> {DECIMAL_FORMAT.format(perf_counter()-start)} seconds to convert {len(yamlFile)} entries")
+    with alive_bar(title_length=40 ) as bar:
+        for key, value in data_files.items():
+            bar.title(f"Processing {key}")
+            yamlFile = LoadYaml(key)
+            CreateMaps(yamlFile, value, client)
 
-    for value in RawResources:
-        mapData.Commodity(properties=value, client=client)
+            bar()
 
-    print(f"{DECIMAL_FORMAT.format(perf_counter()-first_start)} total run time.")
+        for value in RawResources:
+            mapData.Commodity(properties=value, client=client)
     
 
      

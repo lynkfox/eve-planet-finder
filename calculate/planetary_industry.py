@@ -1,9 +1,42 @@
-from models.mapv2 import *
-from models.common import SecurityStatus, iWeightFactor
-from typing import List, Union
+from __future__ import annotations
+import models.mapv2 as mapData
+from models.common import SecurityStatus, iWeightFactor, iWeightResult, DECIMAL_FORMAT
+from typing import List, Union, Tuple
 from dataclasses import dataclass, field
 import numpy
 
+
+@dataclass
+class PlanetaryIndustryResult(iWeightResult):
+    #WeightFactors: PlanetaryIndustryWeightFactor - defined on Parent Class
+    #SortValue: Int - defined in Parent class
+    System: mapData.System = field(init=False)
+    PlanetIds: List[int] = field(init=False, default_factory=list)
+    JumpsFromOrigin: int = field(init=False)
+    OriginSystem: mapData.System = field(init=False)
+    Weight: float = field(init=False)
+    IndividualWeights: Tuple[float, float, float, float] = field(init=False)
+
+    def Populate(self, current_system: mapData.System, origin_system: mapData.System, jumps_from_source: int, weight: tuple) -> PlanetaryIndustryResult:
+        self.System = current_system
+        self.PlanetIds = current_system.Planet_Ids
+        self.OriginSystem = origin_system
+        self.JumpsFromOrigin = jumps_from_source
+        self.SortValue = jumps_from_source
+        self.Weight = weight[0]
+        self.IndividualWeights = weight[1]
+        
+        return self
+
+    def __repr__(self) -> str:
+        planets = [ planet for planet in self.System.GetPlanets(cache=True) if planet.Type_Id in self.WeightFactors.PlanetTypesDesired]
+        planet_types_sub_str = " | ".join([planet.GetType().Name for planet in planets])
+        system_name_str = f"\n>>>>>__________ {self.System.Name} (Jumps: {self.JumpsFromOrigin}) __________<<<<<<"
+        system_weight_str = f"\n - Weight:                          {self.Weight}"
+        weight_values_str = f"\n       -> Jumps: {DECIMAL_FORMAT.format(self.IndividualWeights[0])}, Diversity: {DECIMAL_FORMAT.format(self.IndividualWeights[1])}, Density: {DECIMAL_FORMAT.format(self.IndividualWeights[2])}, Security: {DECIMAL_FORMAT.format(self.IndividualWeights[3])}"
+        planet_types_str = f"\n - Planet Types Available:          {planet_types_sub_str}"
+        
+        return system_name_str+system_weight_str+weight_values_str+planet_types_str
 
 @dataclass
 class PlanetaryIndustryWeightFactor(iWeightFactor):
@@ -40,13 +73,22 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
     SecurityPreference: SecurityStatus = field(kw_only=True, default=SecurityStatus.HIGH_SEC)
 
 
-    def DetermineSystemWeight(self, system: System, jumps_from_source: int) -> int:
+    def DetermineSystemWeight(self, system: mapData.System, jumps_from_source: int) -> Tuple[int, Tuple[int, int, int, int]]:
+        """
+        Determines the Weight of hte system:
+        Jumps from Source * JumpWeight
+        Number of Different Types of Planets * TypeDiversityWeight
+        Number of Planets that match the types * TypeDensityWeight
+        Security Status * Security Weight(affected by SecurityPreference)
+
+        returns: Total Weight, (Jump_Value, Diversity_Value, Density_Value, Security_Value)
+        """
         jump_value = self._calculateJumpValue(jumps_from_source)
-        diversity_value = self._calculateDiversityValue(system.Planet_Ids)
-        density_value = self._calculateDensityValue(system.Planet_Ids)
+        diversity_value = self._calculateDiversityValue(system.PlanetTypes_Ids)
+        density_value = self._calculateDensityValue(system.PlanetTypes_Ids)
         security_value = self._calculateSecurityStatusWeight(system.Security_Status)
 
-        return jump_value+diversity_value+density_value+security_value
+        return jump_value+diversity_value+density_value+security_value, (jump_value, diversity_value, density_value, security_value)
 
     def _calculateSecurityStatusWeight(self, system_security: float)->float:
         adjusted_security = numpy.floor(system_security*10)
@@ -64,9 +106,9 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
                 
         return adjusted_security/10 * self.SecurityWeight
 
-    def _calculateDensityValue(self, system_planet_ids: List[int])->Union[int, float]:
-        density_data = [ptype for ptype in system_planet_ids if ptype in self.PlanetTypesDesired]
-        density_counts = [density_data.count(ptype) for ptype in system_planet_ids]
+    def _calculateDensityValue(self, planet_type_ids: List[int])->Union[int, float]:
+        density_data = [ptype for ptype in planet_type_ids if ptype in self.PlanetTypesDesired]
+        density_counts = [density_data.count(ptype) for ptype in planet_type_ids]
         
         if self.UseAverageDensity:
             # use floor(average*100)/1000 in order to round down to 2 decimal places.
@@ -77,8 +119,8 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
 
         return density_value * self.TypeDensityWeight
 
-    def _calculateDiversityValue(self, system_planet_ids: List[int])->int:
-        return len({ptype for ptype in system_planet_ids if ptype in self.PlanetTypesDesired}) * self.TypeDiversityWeight
+    def _calculateDiversityValue(self, planet_type_ids: List[int])->int:
+        return len({ptype for ptype in planet_type_ids if ptype in self.PlanetTypesDesired}) * self.TypeDiversityWeight
 
     def _calculateJumpValue(self, jumps_from_source:int)->int:
         return (self.MaxJumps-jumps_from_source) * self.JumpWeight
