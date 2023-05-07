@@ -1,195 +1,42 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, fields
-from pickle import dump, load
-from typing import Any, Dict, List, Union
+from dataclasses import dataclass, field, InitVar
+from functools import cached_property
+from typing import Any, Dict, List
 
-from models.common import *
+from data.planetaryResources import *
+from data.planetaryResources import RAW_RESOURCE_TO_TYPE
+from models.common import Position, Universe
+
+MISSING = "ThisValueIsMissing"
 
 
+@dataclass
+class MapClient:
+    ALL_COMMODITIES: List[Commodity] = field(init=False, default_factory=list)
+    ALL_PLANET_TYPES: List[PlanetType] = field(init=False, default_factory=list)
+    ALL_PLANETS: List[Planet] = field(init=False, default_factory=list)
+    ALL_STARGATES: List[Stargate] = field(init=False, default_factory=list)
+    ALL_SYSTEMS: List[System] = field(init=False, default_factory=list)
+    ALL_CONSTELLATIONS: List[Constellation] = field(init=False, default_factory=list)
+    ALL_REGIONS: List[Region] = field(init=False, default_factory=list)
+
+
+@dataclass
 class iStaticDataExport:
-    def Update(self) -> int:
-        """Returns the ID of the static data object to be used as a key in a dict.
-
-        Returns -1 if we want to ignore this entry in the SDE for some reason.
-        """
-        return NotImplementedError
-
-    def Link(self, mapLink: Any):
-        """Links up this object with id's in one of its link lists to ids in the mapLink (usually a dict)"""
-        return NotImplementedError
-
-    def to_dict(self):
-        """Used to convert into a dict for json purposes or data_frame purposes."""
-        output = {}
-        for key, value in self.__dict__:
-
-            if not key.starswith("_"):
-                if isinstance(value, list):
-                    continue
-                output[key] = value
-            else:
-                if key.startswith("_pre"):
-                    output[key] = value
-                continue
-        return output
-
-
-@dataclass
-class PotentialSite:
-    SystemName: str
-    SystemId: int
-    Planets: List[Planet]
-    PlanetType: PlanetType
-    JumpsFromSource: int
-    SourceSystemName: str
-
-    def __eq__(self, __o: Union[PotentialSite, Any]) -> bool:
-        if isinstance(__o, str):
-            return self.SystemName == __o
-
-        if isinstance(__o, int):
-            return self.SystemId == __o
-
-        if isinstance(__o, list):
-            system_names = [site.SystemName for site in __o]
-            system_ids = [site.SystemId for site in __o]
-
-            return self.SystemId in system_ids and self.SystemName in system_names
-
-        return self.SystemId == __o.SystemId and self.SystemName == __o.SystemName
-
-    def __hash__(self) -> int:
-        return hash(self.SystemName + str(self.SystemId))
-
-    def __add__(self, right_hand: PotentialSite) -> PotentialSite:
-        new_site = PotentialSite(
-            SystemName=self.SystemName,
-            SystemId=self.SystemId,
-            PlanetType=self.PlanetType,
-            JumpsFromSource=self.JumpsFromSource
-            if self.JumpsFromSource >= right_hand.JumpsFromSource
-            else right_hand.JumpsFromSource,
-            SourceSystemName=self.SourceSystemName,
-            Planets=self.Planets.extend(right_hand.Planets),
-        )
-        return new_site
-
-
-@dataclass
-class AllData:
-    Regions: Dict[int, Region] = field(kw_only=True, default_factory=dict)
-    Constellations: Dict[int, Constellation] = field(kw_only=True, default_factory=dict)
-    Systems: Dict[int, System] = field(kw_only=True, default_factory=dict)
-    Stargates: Dict[int, Stargate] = field(kw_only=True, default_factory=dict)
-    Planets: Dict[int, Planet] = field(kw_only=True, default_factory=dict)
-    PlanetTypes: Dict[int, PlanetType] = field(kw_only=True, default_factory=dict)
-    RawResources: Dict[int, PIMaterial] = field(kw_only=True, default_factory=dict)
-    Commodities: Dict[int, PIMaterial] = field(kw_only=True, default_factory=dict)
-
-    def _getDispatch(self):
-        return {
-            "Regions": self.Regions,
-            "Constellations": self.Constellations,
-            "Systems": self.Systems,
-            "Stargates": self.Stargates,
-            "Planets": self.Planets,
-            "PlanetTypes": self.PlanetTypes,
-            "RawResources": self.RawResources,
-            "Commodities": self.Commodities,
-        }
-
-    def PickleData(self):
-        print("Picking Data")
-        dispatch = self._getDispatch()
-        for key, value in dispatch.items():
-            with open(f"data/pickled_{key.lower()}", "wb") as pickleFile:
-                print(f"Pickling {key} data")
-                dump(value, pickleFile)
-        print("Data Pickled")
-
-    def PopulateFromPickles(self) -> AllData:
-        output = {}
-        print("Loading Pickled Data")
-        dispatch = self._getDispatch()
-        for key in dispatch.keys():
-            with open(f"data/pickled_{key.lower()}", "rb") as pickleFile:
-                output[key] = load(pickleFile)
-        print("Data Loaded")
-
-        return AllData(**output)
-
-
-@dataclass
-class PIMaterial(iStaticDataExport):
-    Name: str = field(kw_only=True, default=0)
-    Tier: int = field(kw_only=True, default=0)
+    properties: InitVar[Dict[str, Any]]
+    client: MapClient = field(init=True)
+    Name: str = field(kw_only=True, default=None)
     Id: int = field(kw_only=True, default=0)
-    OnTypes: list[PlanetType] = field(kw_only=True, default_factory=list)
-    Ingredients: list[PIMaterial] = field(kw_only=True, default_factory=list)
-    Products: list[PIMaterial] = field(kw_only=True, default_factory=list)
-    _pre_types: list[int] = field(kw_only=True, default_factory=list)
-    _pre_ingredients: list[int] = field(kw_only=True, default_factory=list)
-    _pre_products: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, schematic: Any) -> int:
-        self.Name = schematic["nameID"]["en"]
-        self._pre_ingredients = []
-        self._pre_products = []
-        for resourceID, resource in schematic["types"].items():
-            if resource["isInput"]:
-                self._pre_ingredients.append(resourceID)
-            else:
-                self.Id = resourceID
+    def __hash__(self):
+        return hash(self.Name, self.Id)
 
-        return self.Id
-
-    def Link(self, linkMap: dict):
-        for key, value in linkMap.items():
-            if isinstance(value, PlanetType):
-                for planet_type in self._pre_types:
-                    self.OnTypes.append(linkMap[planet_type])
-                return
-            if isinstance(value, PIMaterial):
-                for resource_id in self._pre_products:
-                    if linkMap.get(f"{resource_id}") is not None:
-                        self.Products.append(linkMap.get(resource_id))
-
-                for resource_id in self._pre_ingredients:
-                    if linkMap.get(f"{resource_id}") is not None:
-                        self.Products.append(linkMap.get(resource_id))
-
-                return
-
-    def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (self.Name, self.Id, self._pre_ingredients, self._pre_products, self._pre_types)
-
-    def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_ingredients, self._pre_products, self._pre_types = state
-        self.Ingredients = []
-        self.Products = []
-        self.OnTypes = []
-
-
-@dataclass
-class PlanetType(iStaticDataExport):
-    Name: str = field(init=False, default="")
-    Id: int = field(init=False, default=0)
-    PlanetaryIndustryMaterials: list[PIMaterial] = field(init=False, default_factory=list)
-
-    def Update(self, planetType: Any) -> int:
-        self.Name = planetType["name"]
-        self.Id = planetType["type_id"]
-        self.PlanetaryIndustryMaterials = []
-        return self.Id
-
-    def Link(self, planetaryMaterials: dict):
-        for value in planetaryMaterials.values():
-            if self.Id in value._pre_types:
-                self.PlanetaryIndustryMaterials.append(value)
+    def __eq__(self, __o):
+        if isinstance(__o, Commodity):
+            return self.Name == __o.Name and self.Id == __o.Id
+        return False
 
     def __getstate__(self):
         """Ignores the recursive object values of other objects in pickling"""
@@ -198,191 +45,462 @@ class PlanetType(iStaticDataExport):
     def __setstate__(self, state):
         """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
         self.Name, self.Id = state
-        self.PlanetaryIndustryMaterials = []
+
+
+@dataclass
+class Commodity(iStaticDataExport):
+
+    Tier: int = field(kw_only=True, default=0)
+    Ingredient_Ids: List[int] = field(kw_only=True, default_factory=list)
+
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["nameID"]["en"]
+            for resourceID, resource in properties["types"].items():
+                if resource["isInput"]:
+                    self.Ingredient_Ids.append(resourceID)
+                else:
+                    self.Id = resourceID
+
+            self._determineTier()
+
+        self.client.ALL_COMMODITIES.append(self)
+
+    @cached_property
+    def Ingredient_Names(self) -> List[str]:
+        return [ingredient.Name for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+
+    def GetIngredients(self, cache: bool = False) -> List[Commodity]:
+        if hasattr(self, "Ingredients"):
+            return self.Ingredients
+        ingredients = [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+        if cache:
+            self.Ingredients = ingredients
+        return ingredients
+
+    def GetRawResourceIds(self, cache: bool = False) -> List[int]:
+
+        if hasattr(self, "RawResource_Ids") and len(self.RawResource_Ids) > 0:
+            return self.RawResource_Ids
+        else:
+            self.RawResource_Ids = []
+
+        temp = []
+
+        for ingredient in self.GetIngredients(cache=cache):
+            if ingredient.Tier > 0:
+                temp.extend(ingredient.GetRawResourceIds(cache=cache))
+            else:
+                return [ingredient.Id]
+
+        if cache:
+            self.RawResource_Ids = temp
+
+        return temp
+
+    def GetRawResources(self, cache: bool = False) -> List[Commodity]:
+        if hasattr(self, "RawResources") and len(self.RawResources) > 0:
+            return self.RawResources
+        else:
+            self.RawResources = []
+
+        if hasattr(self.RawResource_Ids) and len(self.RawResource_Ids) > 0:
+            return [commodity for commodity in self.client.ALL_COMMODITIES if commodity.Id in self.RawResource_Ids]
+
+        temp = []
+
+        for ingredient in self.GetIngredients(cache=cache):
+            if ingredient.Tier > 0:
+                temp.extend(ingredient.GetRawResources(cache=cache))
+            else:
+                return [ingredient]
+
+        if cache:
+            self.RawResources = temp
+
+        return temp
+
+    def _determineTier(self):
+
+        if self.Name in AdvancedCommodities:
+            self.Tier = 4
+        if self.Name in SpecializedCommodities:
+            self.Tier = 3
+        if self.Name in RefinedCommodities:
+            self.Tier = 2
+        if self.Name in BasicCommodities:
+            self.Tier = 1
+
+    def __repr__(self) -> str:
+        return f"Commodity( Name={self.Name}, Id={self.Id}, Tier={self.Tier}, Ingredients={self.IngredientNames} )"
+
+    def __getstate__(self):
+        return (self.Name, self.Id, self.Tier, self.Ingredient_Ids)
+
+    def __setstate__(self, state):
+        self.Name, self.Id, self.Tier, self.Ingredient_Ids = state
+
+
+@dataclass
+class PlanetType(iStaticDataExport):
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"].replace("Planet", "").replace("(", "").replace(")", "").strip()
+            self.Id = properties["type_id"]
+
+        self.client.ALL_PLANET_TYPES.append(self)
+
+    @cached_property
+    def RawResources_Ids(self) -> List[int]:
+        return [key for key, value in RAW_RESOURCE_TO_TYPE.items() if self.Id in value]
+
+    @cached_property
+    def RawResources_Names(self) -> List[Commodity]:
+        return [ingredient.Name for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
+
+    @cached_property
+    def RawResources(self) -> List[Commodity]:
+        return [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.RawResources_Ids]
 
 
 @dataclass
 class Planet(iStaticDataExport):
-    Name: str = field(init=False, default="")
-    Id: int = field(init=False, default=0)
-    System: System = field(init=False, default=None)
-    Type: PlanetType = field(init=False, default=None)
-    _pre_system_id: list[int] = field(kw_only=True, default_factory=list)
-    _pre_type: list[int] = field(kw_only=True, default_factory=list)
+    Type_Id: int = field(kw_only=True, default=0)
+    System_Id: int = field(kw_only=True, default=0)
 
-    def Update(self, system: Any) -> int:
-        self.Name = system["name"]
-        self.Id = system["planet_id"]
-        self._pre_system_id = system["system_id"]
-        self._pre_type = system["type_id"]
-        return self.Id
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"]
+            self.Id = properties["planet_id"]
+            self.System_Id = properties["system_id"]
+            self.Type_Id = properties["type_id"]
 
-    def Link(self, linkMap: Any):
-        for value in linkMap.values():
-            if isinstance(value, PlanetType):
-                self.Type = linkMap[self._pre_type]
-                return
-            if isinstance(value, System):
-                self.System - linkMap(self._pre_system_id)
-                return
+        self.client.ALL_PLANETS.append(self)
+
+    @cached_property
+    def Type_Name(self) -> str:
+        return next((pt.Name for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
+
+    @cached_property
+    def RawResource_Ids(self) -> List[int]:
+        return self.GetType().RawResources_Ids
+
+    @cached_property
+    def RawResource_Names(self) -> List[int]:
+        return self.GetType().RawResources_Names
+
+    def GetType(self, cache: bool = False) -> PlanetType:
+        if hasattr(self, "Type"):
+            return self.Type
+        planet_type = next((pt for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
+        if cache:
+            self.Type = planet_type
+        return planet_type
+
+    def GetSystem(self, cache: bool = False) -> System:
+        if hasattr(self, "System"):
+            return self.System
+        system = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.System_Id), None)
+        if cache:
+            self.System = system
+        return system
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (self.Name, self.Id, self._pre_system_id, self._pre_type)
+        return (self.Name, self.Id, self.System_Id, self.Type_Id)
 
     def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_system_id, self._pre_type = state
-        self.Type = None
-        self.System = None
+        self.Name, self.Id, self.System_Id, self.Type_Id = state
 
 
 @dataclass
 class Stargate(iStaticDataExport):
-    Name: str = field(init=False, default="")
-    Id: int = field(init=False, default=0)
-    DestinationSystem: System = field(init=False, default=None)
-    _pre_destination_id: list[int] = field(kw_only=True, default_factory=list)
+    DestinationSystem_Id: int = field(kw_only=True, default=0)
+    DestinationName: str = field(kw_only=True, default="")
+    OriginSystem_Id: int = field(kw_only=True, default=0)
 
-    def Update(self, stargate: Any) -> int:
-        self.Name = stargate["name"]
-        self.Id = stargate["stargate_id"]
-        self._pre_destination_id = stargate["destination"]["system_id"]
-        return self.Id
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"]
+            self.Id = properties["stargate_id"]
+            self.OriginSystem_Id = properties["system_id"]
+            self.DestinationSystem_Id = properties["destination"]["system_id"]
+            self.DestinationSystem_Name = self.Name.replace("Stargate (", "")[:-1]
 
-    def Link(self, systems: dict):
-        self.DestinationSystem = systems[self._pre_destination_id]
+            self.client.ALL_STARGATES.append(self)
+
+    @cached_property
+    def DestinationSystem_Name(self) -> str:
+        return next((sys.Name for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+
+    @cached_property
+    def DestinationSystem_Position(self) -> Position:
+        return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+
+    @cached_property
+    def OriginSystem_Name(self) -> str:
+        return next((sys.Name for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+
+    @cached_property
+    def OriginSystem_Position(self) -> Position:
+        return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+
+    def GetDestinationSystem(self, cache: bool = False) -> System:
+        if hasattr(self, "Destination"):
+            return self.Destination
+        destination = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
+        if cache:
+            self.Destination = destination
+        return destination
+
+    def GetOriginSystem(self, cache: bool = False) -> System:
+        if hasattr(self, "Origin"):
+            return self.Origin
+        origin = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
+        if cache:
+            self.Origin = origin
+        return origin
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (
-            self.Name,
-            self.Id,
-            self._pre_destination_id,
-        )
+        return (self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name)
 
     def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_destination_id = state
-        self.DestinationSystem = None
+        self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name = state
 
 
 @dataclass
 class System(iStaticDataExport):
-    Name: str = field(init=False, default="")
-    Id: int = field(init=False, default=0)
-    Planets: list[Planet] = field(init=False, default_factory=list)
-    Position: Position = field(init=False, default=None)
-    Links: list[System] = field(init=False, default_factory=list)
-    SecurityStatus: float = field(init=False, default=0.0)
-    _pre_planets: list[int] = field(kw_only=True, default_factory=list)
-    _pre_links: list[int] = field(kw_only=True, default_factory=list)
+    Position: Position = field(kw_only=True, default=None)
+    Security_Status: float = field(kw_only=True, default=1.0)
+    Planet_Ids: List[int] = field(kw_only=True, default_factory=list)
+    Stargate_Ids: List[int] = field(kw_only=True, default_factory=list)
+    Constellation_Id: int = field(kw_only=True, default=0)
 
-    def Update(self, system: Any) -> int:
-        self.Name = system["name"]
-        if re.match(r"AD\d{3}$", self.Name) is not None or re.match(r"V-(\d{3})$", self.Name) is not None:
-            return -1
-        self.Id = system["system_id"]
-        self.SecurityStatus = system["security_status"]
-        self.Planets = []
-        self._pre_planets = system.get("planets")
-        self.Links = []
-        self._pre_links = system.get("stargates")
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"]
+            self.Id = properties["system_id"]
+            self.Planet_Ids = [
+                celestial.get("planet_id", None)
+                for celestial in properties.get("planets", {})
+                if celestial.get("planet_id", None) is not None
+            ]
+            self.Stargate_Ids = properties.get("stargates", [])
+            self.Security_Status = properties["security_status"]
+            self.Constellation_Id = properties["constellation_id"]
 
-        self.Position = Position(
-            X=system["position"]["x"],
-            Y=system["position"]["y"],
-            Z=system["position"]["z"],
-            Universe=Universe.WORMHOLE
-            if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"])
-            else Universe.EDEN,
+            # non accessible constellation, so dont add this system to the general list
+            if self.Constellation_Id == 20000062:
+                return
+
+            self.Position = Position(
+                X=properties["position"]["x"],
+                Y=properties["position"]["y"],
+                Z=properties["position"]["z"],
+                Universe=Universe.WORMHOLE
+                if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"])
+                else Universe.EDEN,
+            )
+
+        if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
+            self.client.ALL_SYSTEMS.append(self)
+
+    @cached_property
+    def Stargate_Names(self) -> List[str]:
+        return [sg.Name for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
+
+    @cached_property
+    def LinkedSystem_Names(self) -> List[str]:
+        return [sg_name.replace("Stargate (", "")[:-1] for sg_name in self.Stargate_Names]
+
+    @cached_property
+    def LinkedSystem_Ids(self) -> List[int]:
+        return [sys.Id for sys in self.client.ALL_SYSTEMS if sys.Name in self.LinkedSystem_Names]
+
+    @cached_property
+    def Planet_Names(self) -> List[str]:
+        return [planet.Name for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
+
+    @cached_property
+    def PlanetTypes_Ids(self) -> List[int]:
+        return [planet.Type_Id for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
+
+    @cached_property
+    def Constellation_Name(self) -> str:
+        return next(
+            (
+                constellation.Name
+                for constellation in self.client.ALL_CONSTELLATIONS
+                if self.Id in constellation.System_Ids
+            ),
+            None,
         )
 
-        return self.Id
+    @cached_property
+    def Region_Name(self) -> str:
+        return next(
+            (
+                constellation.Region_Name
+                for constellation in self.client.ALL_CONSTELLATIONS
+                if self.Constellation_Id == constellation.Id
+            )
+        )
 
-    def Link(self, linkMap: Any):
-        for key, value in linkMap.items():
-            if isinstance(value, Stargate) and self._pre_links is not None:
+    def GetStargates(self, cache: bool = False) -> List[Stargate]:
+        if hasattr(self, "Stargates"):
+            return self.Stargates
+        stargates = [sg for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
+        if cache:
+            self.Stargates = stargates
+        return stargates
 
-                for stargate_id in self._pre_links:
-                    self.Links.append(linkMap[stargate_id].DestinationSystem)
-                return
+    def GetLinkedSystems(self, cache: bool = False) -> List[System]:
+        systems = [sys for sys in self.client.ALL_SYSTEMS if sys.Id in self.LinkedSystem_Ids]
+        if cache:
+            self.Systems = systems
 
-            if isinstance(value, Planet) and self._pre_planets is not None:
-                for planet_data in self._pre_planets:
-                    planet_id = planet_data.get("planet_id")
-                    if planet_id is not None:
-                        self.Planets.append(linkMap[planet_id])
+        return systems
 
-                return
+    def GetPlanets(self, cache: bool = False) -> List[Planet]:
+        if hasattr(self, "Planets"):
+            return self.Planets
+        planets = [planet for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
+        if cache:
+            self.Planets = planets
+        return planets
+
+    def GetConstellation(self, cache: bool = False) -> Constellation:
+        if hasattr(self, "Constellation"):
+            return self.Constellation
+        constellation = next(
+            (constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids),
+            None,
+        )
+        if cache:
+            self.Constellation = constellation
+        return constellation
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (self.Name, self.Id, self._pre_planets, self._pre_links, self.Position)
+        return (
+            self.Name,
+            self.Id,
+            self.Planet_Ids,
+            self.Stargate_Ids,
+            self.Security_Status,
+            self.Position,
+            self.Constellation_Id,
+        )
 
     def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_planets, self._pre_links, self.Position = state
-        self.Planets = []
-        self.Links = []
+        (
+            self.Name,
+            self.Id,
+            self.Planet_Ids,
+            self.Stargate_Ids,
+            self.Security_Status,
+            self.Position,
+            self.Constellation_Id,
+        ) = state
 
 
 @dataclass
 class Constellation(iStaticDataExport):
-    Id: int = field(init=False, default=0)
-    Name: str = field(init=False, default="")
-    Systems: list[System] = field(init=False, default_factory=list)
-    _pre_systems: list[int] = field(kw_only=True, default_factory=list)
+    System_Ids: List[int] = field(kw_only=True, default_factory=list)
+    Region_Id: int = field(kw_only=True, default=0)
+    Position: Position = field(kw_only=True, default=None)
 
-    def Update(self, constellation: Any) -> int:
-        self.Id = constellation["constellation_id"]
-        self.Name = constellation["name"]
-        if re.match(r"ADC\d{2}", self.Name) is not None or re.match(r"VC-\d{3}", self.Name) is not None:
-            return -1
-        self.Systems = []
-        self._pre_systems = constellation["systems"]
-        return self.Id
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"]
+            self.Id = properties["constellation_id"]
+            self.System_Ids = properties.get("systems", [])
+            self.Region_Id = properties["region_id"]
 
-    def Link(self, systems: dict):
-        for system_id in self._pre_systems:
-            self.Systems.append(systems[system_id])
+            # non accessible constellation
+            if self.Id == 20000062:
+                return
+
+            self.Position = Position(
+                X=properties["position"]["x"],
+                Y=properties["position"]["y"],
+                Z=properties["position"]["z"],
+                Universe=Universe.EDEN,
+            )
+
+        if re.match(r"ADC\d{2}", self.Name) is None and re.match(r"VC-\d{3}", self.Name) is None:
+            self.client.ALL_CONSTELLATIONS.append(self)
+
+    @cached_property
+    def Region_Name(self) -> str:
+        return next((region.Name for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
+
+    @cached_property
+    def System_Ids(self) -> List[int]:
+        return [sys.Id for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+
+    @cached_property
+    def System_Names(self) -> List[str]:
+        return [sys.Name for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+
+    def GetRegion(self, cache: bool = False) -> Region:
+        if hasattr(self, "Region"):
+            return self.Region
+        region = next((region for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
+        if cache:
+            self.Region = region
+        return region
+
+    def GetSystems(self, cache: bool = False) -> List[System]:
+        if hasattr(self, "Systems"):
+            return self.Systems
+        systems = [sys for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
+        if cache:
+            self.Systems = systems
+
+        return systems
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (self.Name, self.Id, self._pre_systems)
+        return (self.Name, self.Id, self.System_Ids, self.Position, self.Region_Id)
 
     def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_systems = state
-        self.Systems = []
+        self.Name, self.Id, self.System_Ids, self.Position, self.Region_Id = state
 
 
 @dataclass
 class Region(iStaticDataExport):
-    Id: int = field(init=False, default=0)
-    Name: str = field(init=False, default="")
-    Constellations: list[Constellation] = field(init=False, default_factory=list)
-    _pre_constellations: list[int] = field(kw_only=True, default_factory=list)
+    Constellation_Ids: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, region: Any) -> int:
-        self.Name = region["name"]
-        if re.match(r"ADR\d{2}", self.Name) is not None or re.match(r"VR-\d{2}", self.Name) is not None:
-            return -1
-        self.Id = region["region_id"]
-        self.Constellations = []
-        self._pre_constellations = region["constellations"]
-        return self.Id
+    def __post_init__(self, properties: Dict[str, Any]):
+        if properties is not None:
+            self.Name = properties["name"]
+            self.Id = properties["region_id"]
+            self.Constellation_Ids = properties.get("constellations", [])
 
-    def Link(self, constellations: dict):
+        if re.match(r"ADR\d{2}", self.Name) is None and re.match(r"VR-\d{2}", self.Name) is None:
+            self.client.ALL_REGIONS.append(self)
 
-        for constellation_id in self._pre_constellations:
-            self.Constellations.append(constellations[constellation_id])
+    @cached_property
+    def Constellation_Name(self) -> str:
+        return next(
+            (
+                constellation.Name
+                for constellation in self.client.ALL_CONSTELLATIONS
+                if self.Id == constellation.Region_id
+            ),
+            None,
+        )
+
+    def GetConstellations(self, cache: bool = False) -> List[Constellation]:
+        if hasattr(self, "Constellations"):
+            return self.Constellations
+        constellations = [
+            constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id == constellation.Region_id
+        ]
+        if cache:
+            self.Constellations = constellations
+        return constellations
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling"""
-        return (self.Name, self.Id, self._pre_constellations)
+        return (self.Name, self.Id, self.Constellation_Ids)
 
     def __setstate__(self, state):
-        """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_constellations = state
-        self.Constellations = []
+        self.Name, self.Id, self.Constellation_Ids = state
