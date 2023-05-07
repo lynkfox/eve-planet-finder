@@ -74,7 +74,6 @@ def DisplayMap():
         for ptype in all_data.Planet_Types
         if len(set(ptype.RawResources_Ids).intersection(set(raw_resource_ids))) > 0
     ]
-    systemMap = nx.Graph()
 
     calculator = WeightCalculator(
         WeightFactors=PlanetaryIndustryWeightFactor(
@@ -93,7 +92,7 @@ def DisplayMap():
     graph_values = GraphValuesFactory(calculator)
 
     if len(graph_values.node_names) == 0:  # basically, if there has not yet been any data loaded into the graph values
-        GenerateGraphValues(all_data, systemMap, calculator, graph_values)
+        GenerateGraphValues(all_data, calculator, graph_values)
 
     if PICKLE_GRAPH_DATA:
         with open(PICKLE_FILE_PATH, "wb") as pickleFile:
@@ -230,7 +229,9 @@ def BuildNodesTrace(
     return top_results_trace
 
 
-def GenerateGraphValues(all_data: AllData, systemMap, calculator, graph_values):
+def GenerateGraphValues(all_data: AllData, calculator: WeightCalculator, graph_values: GraphValues):
+    systemMap = nx.Graph()
+
     with alive_bar(all_data.TotalEdenSystems, title_length=47) as bar:
         for system in all_data.Systems:
             if system.Position.Universe == Universe.WORMHOLE:
@@ -292,6 +293,8 @@ def GenerateGraphValues(all_data: AllData, systemMap, calculator, graph_values):
                 "<br>".join([detail.Html() for detail in weight_details.values()]),
             )
         )
+
+    return systemMap
 
 
 def GraphValuesFactory(calculator: WeightCalculator) -> GraphValues:
