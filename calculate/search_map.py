@@ -57,6 +57,10 @@ class WeightCalculator():
         if hasattr(self.WeightFactors, "MaxJumps"):
             self.WeightFactors.MaxJumps = self.MaxJumps
 
+    def GetLogs(self, key)->List[str]:
+        if isinstance(key, str):
+            key = int(key)
+        return self.AllAuditLogs[key]
     
     def Run(self, origin_system: System, method: WeightMethod = WeightMethod.AVERAGE) -> Tuple[int, Dict[int, Any]]:
         """ Runs the Calculations for Weighing each System within MaxJumps from the origin_system
@@ -71,21 +75,26 @@ class WeightCalculator():
         self.Clear()
         self._origin_system = origin_system
         self._add_log(f"==== New Run started for {origin_system.Name} ====")
+        self._add_log(f" *** Expected Match Values: {self.MustFindTargets}")
 
         # weigh the origin system with None as Previous and 0 as current_jumps
-        self._checkNextSystem(origin_system, None, 0, set())
+        any_matches = self._checkNextSystem(origin_system, None, 0, set())
 
-
-        raw_weight = [w.Weight for w in self._results.values()]
-        match method:
-            case WeightMethod.AVERAGE:
-                weight = numpy.floor(numpy.average(raw_weight)*10)/100
-            case WeightMethod.TOTAL:   
-                weight = numpy.floor(numpy.sum(raw_weight)*10)/100
-            case _:
-                weight = raw_weight
+        if any_matches:
+            raw_weight = [w.Weight for w in self._results.values()]
+            match method:
+                case WeightMethod.AVERAGE:
+                    weight = numpy.floor(numpy.average(raw_weight)*10)/100
+                case WeightMethod.TOTAL:   
+                    weight = numpy.floor(numpy.sum(raw_weight)*10)/100
+                case _:
+                    weight = raw_weight
+            self._add_log(f"==== Run Complete: Raw Weight:{raw_weight} | Recorded Weight by {method.name}: {weight} ====")
+        else:
+            weight = -1
+            self._results = {}
+            self._add_log(f"==== Run Complete: Not able to find complete match. Weight: -1 ====")
         
-        self._add_log(f"==== Run Complete: Raw Weight:{raw_weight} | Recorded Weight by {method.name}: {weight} ====")
 
         self._results =  dict(sorted(self._results.items(), key=lambda x:x[1].SortValue, reverse=True))
         self._recordTopValues(weight, origin_system.Id)
@@ -115,11 +124,13 @@ class WeightCalculator():
         if weight > self.TopWeight:
             self.TopWeight = weight
             self.TopDetails = {origin_system_id: self._results}
-            self.AllAuditLogs[origin_system_id].append("New Top Origin System (Previous Systems Removed)")
+            self._add_log("New Top Origin System (Previous Systems Removed)")
+            self.AllAuditLogs[1] = f"[TOP_SYSTEM] {self._origin_system.Name} is new top system with Weight {weight} (removed previous systems)"
 
         if weight == self.TopWeight:
             self.TopDetails[origin_system_id] = self._results
-            self.AllAuditLogs[origin_system_id].append("Current Origin System matches Top Weight, adding to To Details")
+            self._add_log("Current Origin System matches Top Weight, adding to To Details")
+            self.AllAuditLogs[1] = f"[TOP_SYSTEM] {self._origin_system.Name} Matches current top weight ({weight}) (added details to existing)"
 
     
     def _add_log(self, message: str):
@@ -132,7 +143,7 @@ class WeightCalculator():
         self.AllAuditLogs[self._origin_system.Id].append(prefix+message)
     
 
-    def _checkNextSystem(self, current_sys: System, previous_system_id: int, current_jumps:int, current_matched_values: set) -> bool:
+    def _checkNextSystem(self, current_sys: System, previous_system_id: int, current_jumps:int, current_matched_values: set) -> Tuple[bool, set]:
         """
         Recursive function to check all new destinations from a source system, and give their weight.
 
@@ -167,11 +178,14 @@ class WeightCalculator():
             (weight, weight_values) 
         )
 
-        new_matched_values = current_matched_values.union(matched_values) 
+        new_matched_values = current_matched_values.union(matched_values)
 
+        self._add_log(f"{logging_prefix} Weight Values (J, Dv, Dns, sec) {weight_values}")
+        self._add_log(f"{logging_prefix} Current Matched Values {new_matched_values}")
+            
         # if we every meet everything in this chain we can just return - we don't need to search for more systems beyond.
         if new_matched_values == self.MustFindTargets:
-            self._add_log(f"{logging_prefix} Completes a path! Returning TRUE!!!!")
+            self._add_log(f"{logging_prefix} ***** Completes a path! Returning TRUE!!!! *****")
             return True
         elif current_jumps == self.MaxJumps: # and hence, new_matched_values != self.MustFindTargets
             # we've reached the end of this chain. The chain to get here did not find everything, so its not worth keeping

@@ -51,7 +51,7 @@ class PlanetaryIndustryResult(iWeightResult):
         simple_spacing = 5
         planets = [ planet for planet in self.System.GetPlanets(cache=True) if planet.Type_Id in self.WeightFactors.PlanetTypesDesired]
         planet_counts = Counter([planet.GetType().Name for planet in planets])
-        planet_types_sub_str = " | ".join([f"{key} x{value}" for key, value in planet_counts.items()])
+        planet_types_sub_str = " | ".join(sorted([f"{key} x{value}" for key, value in planet_counts.items()]))
 
         if simple:
             system_name_str = f"{self.getSymbol('TitlePrefix',html=html)} {self.System.Name} (Jmp: {self.JumpsFromOrigin}) {self.getSymbol('TitleSuffix',html=html)}"

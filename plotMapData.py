@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import networkx as nx
 from alive_progress import alive_bar
 from pathlib import Path
+import json
 
 X_POSITION_RELATIVE=1
 Y_POSITION_RELATIVE=1
@@ -16,9 +17,13 @@ INCLUDE_PLANET_NAMES = False
 
 COMMODITY_TO_TRACK = "Integrity Response Drones"
 
-USE_CACHE = True
+MAX_JUMPS = 3
 
 WEIGHTING_METHOD = WeightMethod.AVERAGE
+
+USE_CACHE = True
+
+SAVE_AUDIT_LOGS = True
 
 DISPLAY_RESULTS = True
 
@@ -47,6 +52,7 @@ class GraphValues():
         self.top_system_hover_extra = []
         self.save_top_details = None
         self.save_top_weight=None
+        self.logs = None
         
 
 def DisplayMap():
@@ -60,7 +66,7 @@ def DisplayMap():
 
     calculator = WeightCalculator(
         WeightFactors=PlanetaryIndustryWeightFactor(
-            PlanetTypesDesired=[ptype.Id for ptype in planet_types_needed],
+            PlanetTypesDesired=[11, 12, 13, 2015, 2016, 2017],#[ptype.Id for ptype in planet_types_needed],
             JumpWeight=50,
             TypeDensityWeight=50,
             TypeDiversityWeight=25,
@@ -68,7 +74,8 @@ def DisplayMap():
             SecurityPreference=SecurityStatus.HIGH_SEC
         ),
         WeightResults=PlanetaryIndustryResult,
-        MaxJumps=5
+        MaxJumps=MAX_JUMPS,
+        MustFindTargets=set([11, 12, 13, 2015, 2016, 2017])#set([ptype.Id for ptype in planet_types_needed])
     )
 
     graph_values=GraphValues()
@@ -96,12 +103,15 @@ def DisplayMap():
                 system_weight, weight_details = calculator.Run(system, method=WEIGHTING_METHOD)
 
                 systemMap.add_node(system.Name)
-                graph_values.node_names.append(system.Name)
+                graph_values.node_names.append(f"{system.Name}#{system.Id}")
                 graph_values.node_x.append(system.Position.X/X_POSITION_RELATIVE)
                 graph_values.node_y.append(system.Position.Y/Y_POSITION_RELATIVE)
-
-                graph_values.node_custom_data.append((system_weight, system.Constellation_Name, system.Region_Name, "<br>".join([detail.Html(simple=True) for detail in weight_details.values()])))
-
+                if len(weight_details) == 0:
+                    weight_string = f"Not possible get all materials within {MAX_JUMPS}"
+                else:
+                    weight_string = "<br>".join([detail.Html(simple=True) for detail in weight_details.values()])
+                graph_values.node_custom_data.append((system_weight, system.Constellation_Name, system.Region_Name, weight_string))
+                
                 graph_values.node_weight.append(system_weight)
                 graph_values.node_text.append(f"{system.Name}")
 
@@ -114,6 +124,9 @@ def DisplayMap():
                     graph_values.edge_y.append(destination.Position.Y/Y_POSITION_RELATIVE)
                     graph_values.edge_y.append(None)
                 
+        if SAVE_AUDIT_LOGS:
+            with open(f"logs.json", "w") as file:
+                json.dump(calculator.AllAuditLogs, file)
 
         graph_values.save_top_details=calculator.TopDetails
         graph_values.save_top_weight=calculator.TopWeight
@@ -121,15 +134,17 @@ def DisplayMap():
             system = all_data.GetSystem(origin_system_id)
             graph_values.top_system_x.append(system.Position.X/X_POSITION_RELATIVE)
             graph_values.top_system_y.append(system.Position.Y/X_POSITION_RELATIVE)
-            graph_values.top_system_text.append(system.Name)
+            graph_values.top_system_text.append(f"{system.Name}#{system.Id}")
             graph_values.top_system_hover_extra.append((system.Constellation_Name, system.Region_Name, "<br>".join([detail.Html() for detail in weight_details.values()])))
 
 
+    
 
     if PICKLE_GRAPH_DATA:
         with open(PICKLE_FILE_PATH, "wb") as pickleFile:
-                print(f"Pickling {COMMODITY_TO_TRACK} graph data")
-                dump(graph_values, pickleFile)
+            graph_values.logs = calculator.AllAuditLogs
+            print(f"Pickling {COMMODITY_TO_TRACK} graph data")
+            dump(graph_values, pickleFile)
     
     top_results_trace = go.Scatter(
         x=graph_values.top_system_x, y=graph_values.top_system_y,
