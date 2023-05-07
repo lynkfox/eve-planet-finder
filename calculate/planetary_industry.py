@@ -1,8 +1,9 @@
 from __future__ import annotations
 import models.mapv2 as mapData
 from models.common import SecurityStatus, iWeightFactor, iWeightResult, DECIMAL_FORMAT
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Set
 from dataclasses import dataclass, field
+from collections import Counter
 import numpy
 
 
@@ -22,21 +23,59 @@ class PlanetaryIndustryResult(iWeightResult):
         self.PlanetIds = current_system.Planet_Ids
         self.OriginSystem = origin_system
         self.JumpsFromOrigin = jumps_from_source
-        self.SortValue = jumps_from_source
         self.Weight = weight[0]
         self.IndividualWeights = weight[1]
+        self.SortValue = self.Weight
         
         return self
 
-    def __repr__(self) -> str:
+    def getSymbol(self, symbol:str, html:bool=False)->str:
+        symbolLibrary = {
+            "TitlePrefix": ("<b>", ">>>>>__________ "),
+            "TitleSuffix": ("</b>", " __________<<<<<"),
+            "LevelOne": ("<br>&#8594;<i> ", "\n -> "),
+            "LevelTwo": ("<br>  &#8618;<i> ", "\n   => "),
+            "EndItalic": ("</i>", "*"),
+            "NewLine": ("<br>", "\n"),
+            "Italic": ("<i>", "*")
+        }
+
+        return symbolLibrary[symbol][0] if html else symbolLibrary[symbol][1]
+
+    def spacing(self, words:str, total_spacing:int) -> str:
+        return f"{words}{''.join([' ' for _ in range(total_spacing-len(words))])}"
+
+    
+    def Html(self, html:bool=True, simple:bool=False) -> str:
+        level_one_spacing = 30 
+        simple_spacing = 5
         planets = [ planet for planet in self.System.GetPlanets(cache=True) if planet.Type_Id in self.WeightFactors.PlanetTypesDesired]
-        planet_types_sub_str = " | ".join([planet.GetType().Name for planet in planets])
-        system_name_str = f"\n>>>>>__________ {self.System.Name} (Jumps: {self.JumpsFromOrigin}) __________<<<<<<"
-        system_weight_str = f"\n - Weight:                          {self.Weight}"
-        weight_values_str = f"\n       -> Jumps: {DECIMAL_FORMAT.format(self.IndividualWeights[0])}, Diversity: {DECIMAL_FORMAT.format(self.IndividualWeights[1])}, Density: {DECIMAL_FORMAT.format(self.IndividualWeights[2])}, Security: {DECIMAL_FORMAT.format(self.IndividualWeights[3])}"
-        planet_types_str = f"\n - Planet Types Available:          {planet_types_sub_str}"
+        planet_counts = Counter([planet.GetType().Name for planet in planets])
+        planet_types_sub_str = " | ".join([f"{key} x{value}" for key, value in planet_counts.items()])
+
+        if simple:
+            system_name_str = f"{self.getSymbol('TitlePrefix',html=html)} {self.System.Name} (Jmp: {self.JumpsFromOrigin}) {self.getSymbol('TitleSuffix',html=html)}"
+            weight_values_str = f" ".join([
+                f"{self.getSymbol('Italic',html=html)}Weights: (T: {self.Weight}){self.getSymbol('EndItalic',html=html)}{self.getSymbol('NewLine',html=html)} "
+                f"{self.spacing('Jmp:', simple_spacing)}{DECIMAL_FORMAT.format(self.IndividualWeights[0])}",
+                f"{self.spacing('Div:', simple_spacing)}{DECIMAL_FORMAT.format(self.IndividualWeights[1])}",
+                f"{self.spacing('Sec:', simple_spacing)}{DECIMAL_FORMAT.format(self.IndividualWeights[3])}",
+                f"{self.spacing('Dns:', simple_spacing)}{DECIMAL_FORMAT.format(self.IndividualWeights[2])}",
+            ])
+
+            return system_name_str+weight_values_str
+            
+
+        
+        system_name_str = f"{self.getSymbol('TitlePrefix',html=html)}{self.System.Name} (Jumps: {self.JumpsFromOrigin}){self.getSymbol('TitleSuffix',html=html)}"
+        system_weight_str = f"{self.getSymbol('LevelOne',html=html)}{self.spacing('Weight:', level_one_spacing)}{self.getSymbol('EndItalic',html=html)}{self.Weight}"
+        weight_values_str = f"{self.getSymbol('LevelTwo',html=html)}Individual Weights:      Jumps: {self.getSymbol('EndItalic',html=html)}{DECIMAL_FORMAT.format(self.IndividualWeights[0])}, Diversity: {DECIMAL_FORMAT.format(self.IndividualWeights[1])}, Density: {DECIMAL_FORMAT.format(self.IndividualWeights[2])}, Security: {DECIMAL_FORMAT.format(self.IndividualWeights[3])}"
+        planet_types_str = f"{self.getSymbol('LevelOne',html=html)}{self.spacing('Planet Types Available:', level_one_spacing)}{self.getSymbol('EndItalic',html=html)}{planet_types_sub_str}"
         
         return system_name_str+system_weight_str+weight_values_str+planet_types_str
+
+    def __repr__(self) -> str:
+        return self.Html(html=False)
 
 @dataclass
 class PlanetaryIndustryWeightFactor(iWeightFactor):
@@ -73,7 +112,7 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
     SecurityPreference: SecurityStatus = field(kw_only=True, default=SecurityStatus.HIGH_SEC)
 
 
-    def DetermineSystemWeight(self, system: mapData.System, jumps_from_source: int) -> Tuple[int, Tuple[int, int, int, int]]:
+    def DetermineSystemWeight(self, system: mapData.System, jumps_from_source: int) -> Tuple[int, Tuple[int, int, int, int], Set[int]]:
         """
         Determines the Weight of hte system:
         Jumps from Source * JumpWeight
@@ -81,14 +120,15 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
         Number of Planets that match the types * TypeDensityWeight
         Security Status * Security Weight(affected by SecurityPreference)
 
-        returns: Total Weight, (Jump_Value, Diversity_Value, Density_Value, Security_Value)
+        returns: Total Weight, (Jump_Value, Diversity_Value, Density_Value, Security_Value), set(PlanetTypeIDsFound)
         """
         jump_value = self._calculateJumpValue(jumps_from_source)
         diversity_value = self._calculateDiversityValue(system.PlanetTypes_Ids)
         density_value = self._calculateDensityValue(system.PlanetTypes_Ids)
         security_value = self._calculateSecurityStatusWeight(system.Security_Status)
+        planet_type_ids_found = self._determine_what_was_found(system.PlanetTypes_Ids)
 
-        return jump_value+diversity_value+density_value+security_value, (jump_value, diversity_value, density_value, security_value)
+        return jump_value+diversity_value+density_value+security_value, (jump_value, diversity_value, density_value, security_value), planet_type_ids_found
 
     def _calculateSecurityStatusWeight(self, system_security: float)->float:
         adjusted_security = numpy.floor(system_security*10)
@@ -124,3 +164,6 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
 
     def _calculateJumpValue(self, jumps_from_source:int)->int:
         return (self.MaxJumps-jumps_from_source) * self.JumpWeight
+    
+    def _determine_what_was_found(self, planet_type_ids: List[int]) -> Set[int]:
+        return set(self.PlanetTypesDesired).intersection(set(planet_type_ids))

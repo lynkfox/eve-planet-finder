@@ -305,6 +305,7 @@ class System(iStaticDataExport):
         if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
             self.client.ALL_SYSTEMS.append(self)
 
+
     @cached_property
     def Stargate_Names(self)->List[str]:
         return [sg.Name for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
@@ -326,8 +327,12 @@ class System(iStaticDataExport):
         return [planet.Type_Id for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
 
     @cached_property
-    def Constellation_Name(self) -> int:
+    def Constellation_Name(self) -> str:
         return next((constellation.Name for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids), None)
+
+    @cached_property
+    def Region_Name(self) -> str:
+        return next((constellation.Region_Name for constellation in self.client.ALL_CONSTELLATIONS if self.Constellation_Id == constellation.Id))
 
     def GetStargates(self, cache:bool=False)-> List[Stargate]:
         if hasattr(self, "Stargates"):

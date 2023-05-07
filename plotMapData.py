@@ -1,16 +1,16 @@
 from buildMapData import *
-from models.common import Universe, WeightMethod, DECIMAL_FORMAT
+from models.common import Universe, WeightMethod
 from models.mapv2 import *
 from calculate.search_map import WeightCalculator
 from calculate.planetary_industry import PlanetaryIndustryWeightFactor, PlanetaryIndustryResult
-from itertools import chain
-
+import numpy
 import plotly.graph_objects as go
 import networkx as nx
-from time import perf_counter
 from alive_progress import alive_bar
+from pathlib import Path
 
-POSITION_RELATIVE=1
+X_POSITION_RELATIVE=1
+Y_POSITION_RELATIVE=1
 
 INCLUDE_PLANET_NAMES = False
 
@@ -21,140 +21,205 @@ USE_CACHE = True
 WEIGHTING_METHOD = WeightMethod.AVERAGE
 
 DISPLAY_RESULTS = True
+
+PICKLE_GRAPH_DATA = True # If True will cause the simulation to be run and any existing pickled data to be overwritten!
+        # if False, it will attempt to load the data from the pickled data
+PICKLE_FILE_PATH = f"data/pickled_graph_{COMMODITY_TO_TRACK}".replace(" ", "_").lower()
 class GraphValues():
     def __init__(self) -> None:
         self.node_x = []
         self.node_y = []
+        self.node_z = []
         self.node_names = []
+        self.node_custom_data = []
         self.edge_x = []
         self.edge_y = []
+        self.edge_z = []
         self.node_weight = []
         self.node_text = []
         self.top_weight = 0
         self.top_system = []
         self.top_values = {}
+        self.top_system_x = []
+        self.top_system_y = []
+        self.top_system_z = []
+        self.top_system_text = []
+        self.top_system_hover_extra = []
+        self.save_top_details = None
+        self.save_top_weight=None
+        
 
 def DisplayMap():
     all_data = AllData(skip_build=True)
 
     raw_resource_ids = next(commodity for commodity in all_data.Commodities if commodity.Name == COMMODITY_TO_TRACK).GetRawResourceIds(cache=USE_CACHE)
-
+    planet_types_needed = [ptype for ptype in all_data.Planet_Types if len(set(ptype.RawResources_Ids).intersection(set(raw_resource_ids))) > 0]
     systemMap = nx.Graph()
 
     
 
     calculator = WeightCalculator(
         WeightFactors=PlanetaryIndustryWeightFactor(
-            PlanetTypesDesired=[ptype.Id for ptype in all_data.Planet_Types if len(set(ptype.RawResources_Ids).intersection(set(raw_resource_ids))) > 0]
+            PlanetTypesDesired=[ptype.Id for ptype in planet_types_needed],
+            JumpWeight=50,
+            TypeDensityWeight=50,
+            TypeDiversityWeight=25,
+            SecurityWeight=50,
+            SecurityPreference=SecurityStatus.HIGH_SEC
         ),
         WeightResults=PlanetaryIndustryResult,
         MaxJumps=5
     )
 
     graph_values=GraphValues()
+
+    if Path(PICKLE_FILE_PATH).is_file() and not PICKLE_GRAPH_DATA:
+        print(f"Found {PICKLE_FILE_PATH} for this commodity - loading data")
+        with open(PICKLE_FILE_PATH, "rb") as pickleFile:
+            graph_values=load(pickleFile)
+            calculator.TopWeight = graph_values.save_top_weight
+            calculator.TopDetails = graph_values.save_top_details
     
-    start = perf_counter()
-    counter = 0
+    if len(graph_values.node_names) == 0: #basically, if there has not yet been any data loaded into the graph values
 
-    with alive_bar( all_data.TotalEdenSystems, title_length=40 ) as bar:
+        with alive_bar( all_data.TotalEdenSystems, title_length=47 ) as bar:
 
-        for system in all_data.Systems:
+            for system in all_data.Systems:
+                if system.Position.Universe == Universe.WORMHOLE:
+                    continue
+                if len(system.Stargate_Ids) == 0:
+                    continue
+
+                bar.title(f'Analyzing "{system.Constellation_Name}" in the "{system.GetConstellation().Region_Name}" Region')
+                bar()
+
+                system_weight, weight_details = calculator.Run(system, method=WEIGHTING_METHOD)
+
+                systemMap.add_node(system.Name)
+                graph_values.node_names.append(system.Name)
+                graph_values.node_x.append(system.Position.X/X_POSITION_RELATIVE)
+                graph_values.node_y.append(system.Position.Y/Y_POSITION_RELATIVE)
+
+                graph_values.node_custom_data.append((system_weight, system.Constellation_Name, system.Region_Name, "<br>".join([detail.Html(simple=True) for detail in weight_details.values()])))
+
+                graph_values.node_weight.append(system_weight)
+                graph_values.node_text.append(f"{system.Name}")
+
+                for destination in system.GetLinkedSystems():
+                    systemMap.add_edge(system.Name, destination.Name)
+                    graph_values.edge_x.append(system.Position.X/X_POSITION_RELATIVE)
+                    graph_values.edge_x.append(destination.Position.X/X_POSITION_RELATIVE)
+                    graph_values.edge_x.append(None)
+                    graph_values.edge_y.append(system.Position.Y/Y_POSITION_RELATIVE)
+                    graph_values.edge_y.append(destination.Position.Y/Y_POSITION_RELATIVE)
+                    graph_values.edge_y.append(None)
+                
+
+        graph_values.save_top_details=calculator.TopDetails
+        graph_values.save_top_weight=calculator.TopWeight
+        for origin_system_id, weight_details in calculator.TopDetails.items():
+            system = all_data.GetSystem(origin_system_id)
+            graph_values.top_system_x.append(system.Position.X/X_POSITION_RELATIVE)
+            graph_values.top_system_y.append(system.Position.Y/X_POSITION_RELATIVE)
+            graph_values.top_system_text.append(system.Name)
+            graph_values.top_system_hover_extra.append((system.Constellation_Name, system.Region_Name, "<br>".join([detail.Html() for detail in weight_details.values()])))
 
 
-            if system.Position.Universe == Universe.WORMHOLE:
-                continue
 
-            if len(system.Stargate_Ids) == 0:
-                continue
+    if PICKLE_GRAPH_DATA:
+        with open(PICKLE_FILE_PATH, "wb") as pickleFile:
+                print(f"Pickling {COMMODITY_TO_TRACK} graph data")
+                dump(graph_values, pickleFile)
+    
+    top_results_trace = go.Scatter(
+        x=graph_values.top_system_x, y=graph_values.top_system_y,
+        customdata=graph_values.top_system_hover_extra,
+        text=graph_values.top_system_text,
+        hovertemplate='<b>%{text}</b><br><i>%{customdata[0]}, %{customdata[1]}<br>%{customdata[2]}<extra></extra>',
+        mode='markers',
+        marker=go.scatter.Marker(
+            symbol="star-diamond",
+            size=25,
+            color="crimson"
+        )
+    )
 
-            bar.title(f'Analyzing "{system.Constellation_Name}" in the "{system.GetConstellation().Region_Name}" Region')
-
-
-            system_weight, _ = calculator.Run(system, method=WEIGHTING_METHOD)
-            
-
-            systemMap.add_node(system.Name)
-            graph_values.node_names.append(system.Name)
-            graph_values.node_x.append(system.Position.X/POSITION_RELATIVE)
-            graph_values.node_y.append(system.Position.Y/POSITION_RELATIVE)
-
-            graph_values.node_weight.append(system_weight)
-            graph_values.node_text.append(f"{system.Name} - {system_weight}")
-
-            for destination in system.GetLinkedSystems():
-                systemMap.add_edge(system.Name, destination.Name)
-                graph_values.edge_x.append(system.Position.X/POSITION_RELATIVE)
-                graph_values.edge_x.append(destination.Position.X/POSITION_RELATIVE)
-                graph_values.edge_x.append(None)
-                graph_values.edge_y.append(system.Position.Y/POSITION_RELATIVE)
-                graph_values.edge_y.append(destination.Position.Y/POSITION_RELATIVE)
-                graph_values.edge_y.append(None)
-            
-            bar()
-        
-
-
+    
     edge_trace = go.Scatter(
         x=graph_values.edge_x, y=graph_values.edge_y,
-        line=dict(width=0.5, color='#888'),
+        line=dict(width=.5, color="#000"),
         hoverinfo='none',
         mode='lines')
 
-
+    
     node_trace = go.Scatter(
+        text=graph_values.node_text,
         x=graph_values.node_x, y=graph_values.node_y,
         mode='markers',
-        hoverinfo='text',
-        marker=dict(
+        customdata=graph_values.node_custom_data,
+        hovertemplate="".join([
+            '<b>%{text}</b> | Weight: <i>%{customdata[0]:.2f}</i>',
+            '<br>%{customdata[1]}</i>, %{customdata[2]}</i>',
+            '<br>%{customdata[3]}'
+            '<extra></extra>'
+            ]),
+        marker=go.scatter.Marker(
             showscale=True,
-            # colorscale options
-            #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
-            #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
-            #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-            colorscale='YlGnBu',
+            colorscale='RdGy',
             reversescale=True,
-            color=[],
-            size=10,
-            colorbar=dict(
+            size= 10,
+            color=graph_values.node_weight,
+            colorbar=go.scatter.marker.ColorBar(
                 thickness=15,
-                title='More PI Planets, Closer',
+                title='Systems with fewest jumps to get to all raw resources',
                 xanchor='left',
                 titleside='right'
             ),
-            line_width=2))
+            line=go.scatter.marker.Line(
+                width=2,
+                color="black"
+            ),
+        )
+    )
     
     
 
-    node_trace.marker.color = graph_values.node_weight
-    node_trace.text = graph_values.node_text
-
-    top_system = [all_data.GetSystem(key).Name for key in calculator.TopDetails.keys()]
-    top_weight = calculator.TopWeight
-
-    fig = go.Figure(data=[edge_trace, node_trace],
+    fig = go.Figure(data=[edge_trace, node_trace, top_results_trace],
              layout=go.Layout(
-                title=f'<br>Eve Online System Map - Weighted by Closeness for all PI for {COMMODITY_TO_TRACK}<br>{top_system} with weight of {top_weight}',
+                title=f'<br>Eve Online System Map - Planetary Industry - Weighted by Minimal Jumps from source, Max Diversity of Planet Types',
                 titlefont_size=16,
                 showlegend=False,
                 hovermode='closest',
-                margin=dict(b=20,l=5,r=5,t=40),
-                annotations=[ dict(
-                    showarrow=False,
-                    xref="paper", yref="paper",
-                    x=0.005, y=-0.002 ) ],
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                margin=go.layout.Margin(b=20,l=5,r=5,t=40),
+                annotations=[ go.layout.Annotation(
+                    text=f'<b>{COMMODITY_TO_TRACK}:</b><br>| {" | ".join(sorted([ptype.Name for ptype in planet_types_needed]))} |',
+                    showarrow=True,
+                    xref="paper", 
+                    yref="paper",
+                    x=0.25, 
+                    y=-0.002)],
+                xaxis=go.layout.XAxis(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=go.layout.YAxis(showgrid=False, zeroline=False, showticklabels=False))
                 )
     fig.show()
 
     
 
     if DISPLAY_RESULTS:
+        DisplayResultsToStdOut(all_data, planet_types_needed, calculator)
+
+def DisplayResultsToStdOut(all_data, planet_types_needed, calculator):
+    print(f"*** Looking for Planets to create: {COMMODITY_TO_TRACK} ***")
+    print(f"> Needs:")
+    print(f"    > {' | '.join(sorted([ptype.Name for ptype in planet_types_needed]))}")
+    
+
+    if PICKLE_GRAPH_DATA:
         print(f"=======Top Systems=======")
-        print(f"     {top_system}")
-        
+        print(f"     {', '.join([all_data.GetSystem(key).Name for key in calculator.TopDetails.keys()])}")
+            
         for key, value in calculator.TopDetails.items():
-            print(all_data.GetSystem(key).Name)
+            print(f">>>>> {all_data.GetSystem(key).Name}")
             for entry in value.values():
                 print(entry)
 

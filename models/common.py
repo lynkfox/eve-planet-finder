@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-DECIMAL_FORMAT = "{:.3f}"
+DECIMAL_FORMAT = "{:.1f}"
 
 class Universe(Enum):
     EDEN=1
     WORMHOLE=2
+    JOVIAN=3
 
 class SecurityStatus(Enum):
     HIGH_SEC=1
@@ -56,4 +57,8 @@ class iWeightResult():
         """ Method to populate the details of the Child WeightResult class
         must return Self
         """
+        raise NotImplementedError
+    
+    def Html(self) -> str:
+        """Convert the str __repr__ of this object to HTML"""
         raise NotImplementedError

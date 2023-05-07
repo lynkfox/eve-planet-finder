@@ -105,7 +105,7 @@ class AllData():
         
     @cached_property
     def TotalEdenSystems(self)->int:
-        return len([sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN])
+        return len([sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0])
 
 
     def PickleAll(self):
@@ -117,7 +117,7 @@ class AllData():
         print("Data Pickled")
 
     def PopulateFromPickles(self):
-        print("Loading Pickled Data")
+        print("Loading Pickled Map Data")
         for attribute in self.PickleAttributes:
             pickle_file_path = f"data/pickled_{attribute.lower()}"
             with open(pickle_file_path, "rb") as pickleFile:
@@ -126,7 +126,7 @@ class AllData():
                     item.client=self.MapClient
                 setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
                  
-        print("Data Loaded")
+        print("Map Data Loaded")
 
 def BuildMapData(client: mapData.MapClient):
 
