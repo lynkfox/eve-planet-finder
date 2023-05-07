@@ -1,131 +1,152 @@
 from models.common import *
-from models.map import *
+import models.mapv2 as mapData
 from data.planetaryResources import *
 import yaml
-from typing import Any
+from typing import Any, Union
 import codecs
 from time import perf_counter
+from pickle import dump, load
+from alive_progress import alive_bar
+from functools import cached_property
 
-DECIMAL_FORMAT = "{:.3f}"
 
 
-all_map_data = AllData()
+data_files = {
+    "data/regions.en-us.yaml": mapData.Region,
+    "data/constellations.en-us.yaml": mapData.Constellation,
+    "data/systems.en-us.yaml": mapData.System,
+    "data/stargates.en-us.yaml": mapData.Stargate,
+    "data/planets.en-us.yaml": mapData.Planet,
+    "data/planetTypes.yaml": mapData.PlanetType,
+    "data/planetSchematics.yaml": mapData.Commodity,
+}
+
+
+
 
 def LoadYaml(file_name: str)->Any:
     with codecs.open(file_name, 'r', encoding='utf-8', errors='ignore') as fdata:
         return yaml.safe_load(fdata)
 
-def CreateMaps(file_path, obj) -> dict:
-    yamlFile = LoadYaml(file_path)
-    output = {}
+def CreateMaps(data, obj, client) -> dict:
+    if isinstance(data, list):
+        for item in list:
+            obj(properties=item, client=client)
+    else:
+        for value in data.values():
+            obj(properties=value, client=client)
 
-    for key, value in yamlFile.items():
-        newValue = obj()
-        item_id = newValue.Update(value)
-        if item_id == -1:
-            continue
-        if item_id is None:
-            item_id = key
-        if isinstance(item_id, str):
-            item_id = int(item_id)
-        output[item_id] = newValue
-
-    return output
-
-
-def LinkMaps(data, insert_data):
-    for value in data.values():
-        value.Link(insert_data)
-
-def BuildMapData():
-    start_first = perf_counter()
-    all_map_data.Regions = CreateMaps("data/regions.en-us.yaml", Region)
-    print(f"Regions Loaded in {DECIMAL_FORMAT.format(perf_counter()-start_first)} seconds")
-    
-    start = perf_counter()
-    all_map_data.Constellations = CreateMaps("data/constellations.en-us.yaml", Constellation)
-    print(f"Constellations Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    start = perf_counter()
-    all_map_data.Systems = CreateMaps("data/systems.en-us.yaml", System)
-    print(f"Systems Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    start = perf_counter()
-    all_map_data.Stargates = CreateMaps("data/stargates.en-us.yaml", Stargate)
-    print(f"Stargates Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    start = perf_counter()
-    all_map_data.Planets = CreateMaps("data/planets.en-us.yaml", Planet)
-    print(f"Planets Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    start = perf_counter()
-    all_map_data.PlanetTypes = CreateMaps("data/planetTypes.yaml", PlanetType)
-    print(f"Planet Types Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-
-    start = perf_counter()
-    all_map_data.Commodities = CreateMaps("data/planetSchematics.yaml", PIMaterial)
-    print(f"Commodities Loaded in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    all_map_data.RawResources = RawResources
-
-    print("\n=======All Data Loaded, starting links=========\n")
-
-    LinkAllMaps(all_map_data)
     
     
-    print(f"All data loaded: total time = {DECIMAL_FORMAT.format(perf_counter()-start_first)} seconds")
 
-def LinkAllMaps(map_data: AllData, regions=True, constellations=True):
-    if regions:
-        start = perf_counter()
-        LinkMaps(map_data.Regions, map_data.Constellations)
-        print(f"Constellations Linked to Regions in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+class AllData():
+    def __init__(self, skip_build:bool=False) -> None:
+        self.MapClient = mapData.MapClient()
+        self.PickleAttributes = [
+            "Commodities", "Planet_Types", "Planets", "Stargates", "Systems", "Constellations", "Regions"
+        ]
+        if skip_build:
+            self.PopulateFromPickles()
+        else:
+            BuildMapData(self.MapClient)
 
-    if constellations:
-        start = perf_counter()
-        LinkMaps(map_data.Constellations, map_data.Systems)
-        print(f"Systems linked to Constellations in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+        self.SetAllData()
+
+    def SetAllData(self):
+        self.Commodities = self.MapClient.ALL_COMMODITIES
+        self.Planet_Types = self.MapClient.ALL_PLANET_TYPES
+        self.Planets = self.MapClient.ALL_PLANETS
+        self.Stargates = self.MapClient.ALL_STARGATES
+        self.Systems = self.MapClient.ALL_SYSTEMS
+        self.Constellations = self.MapClient.ALL_CONSTELLATIONS
+        self.Regions = self.MapClient.ALL_REGIONS
+
+    def GetCommodity(self, value:Union[str, int])->mapData.Commodity:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Commodities if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Commodities if commodity.Id == value)
+        
+    def GetPlanetType(self, value:Union[str, int])->mapData.PlanetType:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.PlanetTypes if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.PlanetTypes if commodity.Id == value)
+
+    def GetPlanet(self, value:Union[str, int])->mapData.Planet:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Planets if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Planets if commodity.Id == value)
+
+    def GetStargate(self, value:Union[str, int])->mapData.Stargate:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Stargates if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Stargates if commodity.Id == value)
+
+    def GetSystem(self, value:Union[str, int])->mapData.System:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Systems if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Systems if commodity.Id == value)
     
-    start = perf_counter()
-    LinkMaps(map_data.Stargates, map_data.Systems)
-    print(f"Stargates linked to Systems in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+    def GetConstellation(self, value:Union[str, int])->mapData.Constellation:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Constellations if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Constellations if commodity.Id == value)
     
-    start = perf_counter()
-    LinkMaps(map_data.Planets, map_data.PlanetTypes)
-    print(f"Planet Types linked to Planets in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+    def GetRegion(self, value:Union[str, int])->mapData.Region:
+        if isinstance(value, str):
+            return next(commodity for commodity in self.Regions if commodity.Name == value)
+        if isinstance(value, int):
+            return next(commodity for commodity in self.Regions if commodity.Id == value)
+        
+    @cached_property
+    def TotalEdenSystems(self)->int:
+        return len([sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0])
 
-    start = perf_counter()
-    LinkMaps(map_data.RawResources, map_data.PlanetTypes)
-    LinkMaps(map_data.PlanetTypes, map_data.RawResources)
-    print(f"Planet Types and Raw Resources linked in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
-    # start = perf_counter()
-    # LinkMaps(RawResources, Commodities)
-    # LinkMaps(Commodities, RawResources)
-    # print(f"Commodity Production Chains Linked {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
+    def PickleAll(self):
+        print("Picking Data")
+        for attribute in self.PickleAttributes:
+            with open(f"data/pickled_{attribute.lower()}", "wb") as pickleFile:
+                print(f"Pickling {attribute} data")
+                dump(getattr(self, attribute), pickleFile)
+        print("Data Pickled")
+
+    def PopulateFromPickles(self):
+        print("Loading Pickled Map Data")
+        for attribute in self.PickleAttributes:
+            pickle_file_path = f"data/pickled_{attribute.lower()}"
+            with open(pickle_file_path, "rb") as pickleFile:
+                un_pickled_data=load(pickleFile)
+                for item in un_pickled_data:
+                    item.client=self.MapClient
+                setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
+                 
+        print("Map Data Loaded")
+
+def BuildMapData(client: mapData.MapClient):
+
+    with alive_bar(title_length=40 ) as bar:
+        for key, value in data_files.items():
+            bar.title(f"Processing {key}")
+            yamlFile = LoadYaml(key)
+            CreateMaps(yamlFile, value, client)
+
+            bar()
+
+        for value in RawResources:
+            mapData.Commodity(properties=value, client=client)
     
-    start = perf_counter()
-    LinkMaps(map_data.Systems, map_data.Planets)
-    print(f"Planets linked to Systems in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
-    
-    start = perf_counter()
-    LinkMaps(map_data.Systems, map_data.Stargates)
-    print(f"Systems linked to each other in {DECIMAL_FORMAT.format(perf_counter()-start)} seconds")
 
-    return map_data
-
-def PickleAll():
-    all_map_data.PickleData()
-
-def LoadPickles(regions=False, constellations=False)->AllData:
-    all_map = AllData()
-    all_map = all_map.PopulateFromPickles()
-    return LinkAllMaps(all_map, regions=regions, constellations=constellations)
      
 
 if __name__ == "__main__":
-    BuildMapData()
-    PickleAll()
+    data = AllData()
+    data.PickleAll()
 
     
 

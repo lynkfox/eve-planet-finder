@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from data.planetaryResources import RawResources, ResourceNameMap
 from models.map import *
 from buildMapData import LoadPickles
 from typing import Tuple, List, Dict, Union
@@ -12,18 +11,18 @@ MISSING_PLANET_TYPE_WEIGHT = -1
 
 MAX_JUMPS = 5
 RawResourcesDesired = [
-    ResourceNameMap["Aqueous Liquids"],
-    ResourceNameMap["Autotrophs"],
-    ResourceNameMap["Base Metals"],
-    ResourceNameMap["Carbon Compounds"],
-    ResourceNameMap["Felsic Magma"],
-    ResourceNameMap["Micro-Organisms"],
-    ResourceNameMap["Noble Gas"],
-    ResourceNameMap["Noble Metals"],
-    ResourceNameMap["Non-CS Crystals"],
-    ResourceNameMap["Suspended Plasma"],
-    ResourceNameMap["Planktic Colonies"],
-    ResourceNameMap["Reactive Gas"]
+    "Aqueous Liquids",
+    "Autotrophs",
+    "Base Metals",
+    "Carbon Compounds",
+    "Felsic Magma",
+    "Micro-Organisms",
+    "Noble Gas",
+    "Noble Metals",
+    "Non-CS Crystals",
+    "Suspended Plasma",
+    "Planktic Colonies",
+    "Reactive Gas"
 ]
 
 @dataclass
