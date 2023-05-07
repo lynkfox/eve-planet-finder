@@ -10,7 +10,7 @@ from buildMapData import *
 from calculate.planetary_industry import PlanetaryIndustryResult, PlanetaryIndustryWeightFactor
 from calculate.search_map import WeightCalculator
 from models.common import Universe, WeightMethod
-from models.mapv2 import *
+from models.map import *
 
 X_POSITION_RELATIVE = 1
 Y_POSITION_RELATIVE = 1

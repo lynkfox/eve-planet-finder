@@ -6,7 +6,7 @@ from typing import List, Set, Tuple, Union
 
 import numpy
 
-import models.mapv2 as mapData
+import models.map as mapData
 from models.common import DECIMAL_FORMAT, iWeightFactor, iWeightResult, SecurityStatus
 
 

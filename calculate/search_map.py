@@ -3,7 +3,7 @@ from typing import Dict, Tuple
 
 from calculate.planetary_industry import *
 from models.common import WeightMethod
-from models.mapv2 import *
+from models.map import *
 
 
 @dataclass

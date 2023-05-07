@@ -7,7 +7,7 @@ from typing import Any, Union
 import yaml
 from alive_progress import alive_bar
 
-import models.mapv2 as mapData
+import models.map as mapData
 from data.planetaryResources import *
 from models.common import *
 
