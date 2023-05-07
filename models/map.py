@@ -14,17 +14,23 @@ MISSING = "ThisValueIsMissing"
 
 @dataclass
 class MapClient:
-    ALL_COMMODITIES: List[Commodity] = field(init=False, default_factory=list)
-    ALL_PLANET_TYPES: List[PlanetType] = field(init=False, default_factory=list)
-    ALL_PLANETS: List[Planet] = field(init=False, default_factory=list)
-    ALL_STARGATES: List[Stargate] = field(init=False, default_factory=list)
-    ALL_SYSTEMS: List[System] = field(init=False, default_factory=list)
-    ALL_CONSTELLATIONS: List[Constellation] = field(init=False, default_factory=list)
-    ALL_REGIONS: List[Region] = field(init=False, default_factory=list)
+    ALL_COMMODITIES: Dict[int, Commodity] = field(init=False, default_factory=dict)
+    ALL_PLANET_TYPES: Dict[int, PlanetType] = field(init=False, default_factory=dict)
+    ALL_PLANETS: Dict[int, Planet] = field(init=False, default_factory=dict)
+    ALL_STARGATES: Dict[int, Stargate] = field(init=False, default_factory=dict)
+    ALL_SYSTEMS: Dict[int, System] = field(init=False, default_factory=dict)
+    ALL_CONSTELLATIONS: Dict[int, Constellation] = field(init=False, default_factory=dict)
+    ALL_REGIONS: Dict[int, Region] = field(init=False, default_factory=dict)
 
 
 @dataclass
 class iStaticDataExport:
+    """
+    Parent class to all SDE data models. Since they will all have a name and an ID, we can set these for some basic functionality.
+
+    Mainly, hash and eq. Contains a primitive __getstate__ and __setstate__ for pickling but these should be redone for each
+    """
+
     properties: InitVar[Dict[str, Any]]
     client: MapClient = field(init=True)
     Name: str = field(kw_only=True, default=None)
@@ -64,21 +70,35 @@ class Commodity(iStaticDataExport):
 
             self._determineTier()
 
-        self.client.ALL_COMMODITIES.append(self)
+        self.client.ALL_COMMODITIES[self.Id] = self
 
     @cached_property
     def Ingredient_Names(self) -> List[str]:
-        return [ingredient.Name for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+        return [self.client.ALL_COMMODITIES[ingr_id].Name for ingr_id in self.Ingredient_Ids]
 
-    def GetIngredients(self, cache: bool = False) -> List[Commodity]:
+    def GetIngredients(self, cache: bool = True) -> Dict[int, Commodity]:
+        """
+        Get all Ingredients that make up this Commodity.
+
+        :param cache[bool, default:True]: If true, will store the the values retrieved to prevent further performance cost of re-running this operation
+
+        :return Dict[int, Commodity]:  {Commodity.Id: Commodity map} of this Commodities ingredients.
+        """
         if hasattr(self, "Ingredients"):
             return self.Ingredients
-        ingredients = [ingredient for ingredient in self.client.ALL_COMMODITIES if ingredient.Id in self.Ingredient_Ids]
+        ingredients = {ingr_id: self.client.ALL_COMMODITIES[ingr_id] for ingr_id in self.Ingredient_Ids}
         if cache:
             self.Ingredients = ingredients
         return ingredients
 
-    def GetRawResourceIds(self, cache: bool = False) -> List[int]:
+    def GetRawResourceIds(self, cache: bool = True) -> List[int]:
+        """
+        Walks back down the production tree until it arrives at a Raw Resource. Returns all the IDs.
+
+        :param cache[bool, default:True]: If true, will store the the values retrieved to prevent further performance cost of re-running this operation
+
+        :return List[int]: Commodity.Id values of all the Raw Resources required to make this Commodity.
+        """
 
         if hasattr(self, "RawResource_Ids") and len(self.RawResource_Ids) > 0:
             return self.RawResource_Ids
@@ -87,33 +107,40 @@ class Commodity(iStaticDataExport):
 
         temp = []
 
-        for ingredient in self.GetIngredients(cache=cache):
+        for ingr_id, ingredient in self.GetIngredients(cache=cache).values():
             if ingredient.Tier > 0:
                 temp.extend(ingredient.GetRawResourceIds(cache=cache))
             else:
-                return [ingredient.Id]
+                return [ingr_id]
 
         if cache:
             self.RawResource_Ids = temp
 
         return temp
 
-    def GetRawResources(self, cache: bool = False) -> List[Commodity]:
+    def GetRawResources(self, cache: bool = True) -> Dict[int, Commodity]:
+        """
+        Walks back down the production tree until it arrives at a Raw Resource. Returns all the Commodities.
+
+        :param cache[bool, default:True]: If true, will store the the values retrieved to prevent further performance cost of re-running this operation
+
+        :return Dict[int, Commodity]: {Commodity.Id: Commodity} map of the Raw Resources that would be required to make this Commodity.
+        """
         if hasattr(self, "RawResources") and len(self.RawResources) > 0:
             return self.RawResources
         else:
-            self.RawResources = []
+            self.RawResources = {}
 
         if hasattr(self.RawResource_Ids) and len(self.RawResource_Ids) > 0:
-            return [commodity for commodity in self.client.ALL_COMMODITIES if commodity.Id in self.RawResource_Ids]
+            return {ingr_id: self.client.ALL_COMMODITIES[ingr_id] for ingr_id in self.RawResource_Ids}
 
-        temp = []
+        temp = {}
 
         for ingredient in self.GetIngredients(cache=cache):
             if ingredient.Tier > 0:
-                temp.extend(ingredient.GetRawResources(cache=cache))
+                temp = {**temp, **ingredient.GetRawResources(cache=cache)}
             else:
-                return [ingredient]
+                return {ingredient.Id, ingredient}
 
         if cache:
             self.RawResources = temp
@@ -148,7 +175,7 @@ class PlanetType(iStaticDataExport):
             self.Name = properties["name"].replace("Planet", "").replace("(", "").replace(")", "").strip()
             self.Id = properties["type_id"]
 
-        self.client.ALL_PLANET_TYPES.append(self)
+        self.client.ALL_PLANET_TYPES[self.Id] = self
 
     @cached_property
     def RawResources_Ids(self) -> List[int]:
@@ -175,7 +202,7 @@ class Planet(iStaticDataExport):
             self.System_Id = properties["system_id"]
             self.Type_Id = properties["type_id"]
 
-        self.client.ALL_PLANETS.append(self)
+        self.client.ALL_PLANETS[self.Id] = self
 
     @cached_property
     def Type_Name(self) -> str:
@@ -189,7 +216,7 @@ class Planet(iStaticDataExport):
     def RawResource_Names(self) -> List[int]:
         return self.GetType().RawResources_Names
 
-    def GetType(self, cache: bool = False) -> PlanetType:
+    def GetType(self, cache: bool = True) -> PlanetType:
         if hasattr(self, "Type"):
             return self.Type
         planet_type = next((pt for pt in self.client.ALL_PLANET_TYPES if pt.Id == self.Type_Id), None)
@@ -197,7 +224,7 @@ class Planet(iStaticDataExport):
             self.Type = planet_type
         return planet_type
 
-    def GetSystem(self, cache: bool = False) -> System:
+    def GetSystem(self, cache: bool = True) -> System:
         if hasattr(self, "System"):
             return self.System
         system = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.System_Id), None)
@@ -226,7 +253,7 @@ class Stargate(iStaticDataExport):
             self.DestinationSystem_Id = properties["destination"]["system_id"]
             self.DestinationSystem_Name = self.Name.replace("Stargate (", "")[:-1]
 
-            self.client.ALL_STARGATES.append(self)
+            self.client.ALL_STARGATES[self.Id] = self
 
     @cached_property
     def DestinationSystem_Name(self) -> str:
@@ -244,7 +271,7 @@ class Stargate(iStaticDataExport):
     def OriginSystem_Position(self) -> Position:
         return next((sys.Position for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
 
-    def GetDestinationSystem(self, cache: bool = False) -> System:
+    def GetDestinationSystem(self, cache: bool = True) -> System:
         if hasattr(self, "Destination"):
             return self.Destination
         destination = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.DestinationSystem_Id), None)
@@ -252,7 +279,7 @@ class Stargate(iStaticDataExport):
             self.Destination = destination
         return destination
 
-    def GetOriginSystem(self, cache: bool = False) -> System:
+    def GetOriginSystem(self, cache: bool = True) -> System:
         if hasattr(self, "Origin"):
             return self.Origin
         origin = next((sys for sys in self.client.ALL_SYSTEMS if sys.Id == self.OriginSystem_Id), None)
@@ -302,7 +329,7 @@ class System(iStaticDataExport):
             )
 
         if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
-            self.client.ALL_SYSTEMS.append(self)
+            self.client.ALL_SYSTEMS[self.Id] = self
 
     @cached_property
     def Stargate_Names(self) -> List[str]:
@@ -345,7 +372,7 @@ class System(iStaticDataExport):
             )
         )
 
-    def GetStargates(self, cache: bool = False) -> List[Stargate]:
+    def GetStargates(self, cache: bool = True) -> List[Stargate]:
         if hasattr(self, "Stargates"):
             return self.Stargates
         stargates = [sg for sg in self.client.ALL_STARGATES if sg.Id in self.Stargate_Ids]
@@ -353,14 +380,14 @@ class System(iStaticDataExport):
             self.Stargates = stargates
         return stargates
 
-    def GetLinkedSystems(self, cache: bool = False) -> List[System]:
+    def GetLinkedSystems(self, cache: bool = True) -> List[System]:
         systems = [sys for sys in self.client.ALL_SYSTEMS if sys.Id in self.LinkedSystem_Ids]
         if cache:
             self.Systems = systems
 
         return systems
 
-    def GetPlanets(self, cache: bool = False) -> List[Planet]:
+    def GetPlanets(self, cache: bool = True) -> List[Planet]:
         if hasattr(self, "Planets"):
             return self.Planets
         planets = [planet for planet in self.client.ALL_PLANETS if planet.Id in self.Planet_Ids]
@@ -368,7 +395,7 @@ class System(iStaticDataExport):
             self.Planets = planets
         return planets
 
-    def GetConstellation(self, cache: bool = False) -> Constellation:
+    def GetConstellation(self, cache: bool = True) -> Constellation:
         if hasattr(self, "Constellation"):
             return self.Constellation
         constellation = next(
@@ -427,7 +454,7 @@ class Constellation(iStaticDataExport):
             )
 
         if re.match(r"ADC\d{2}", self.Name) is None and re.match(r"VC-\d{3}", self.Name) is None:
-            self.client.ALL_CONSTELLATIONS.append(self)
+            self.client.ALL_CONSTELLATIONS[self.Id] = self
 
     @cached_property
     def Region_Name(self) -> str:
@@ -441,7 +468,7 @@ class Constellation(iStaticDataExport):
     def System_Names(self) -> List[str]:
         return [sys.Name for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
 
-    def GetRegion(self, cache: bool = False) -> Region:
+    def GetRegion(self, cache: bool = True) -> Region:
         if hasattr(self, "Region"):
             return self.Region
         region = next((region for region in self.client.ALL_REGIONS if self.Id in region.Constellation_Ids), None)
@@ -449,7 +476,7 @@ class Constellation(iStaticDataExport):
             self.Region = region
         return region
 
-    def GetSystems(self, cache: bool = False) -> List[System]:
+    def GetSystems(self, cache: bool = True) -> List[System]:
         if hasattr(self, "Systems"):
             return self.Systems
         systems = [sys for sys in self.client.ALL_SYSTEMS if self.Id == sys.Constellation_Id]
@@ -476,7 +503,7 @@ class Region(iStaticDataExport):
             self.Constellation_Ids = properties.get("constellations", [])
 
         if re.match(r"ADR\d{2}", self.Name) is None and re.match(r"VR-\d{2}", self.Name) is None:
-            self.client.ALL_REGIONS.append(self)
+            self.client.ALL_REGIONS[self.Id] = self
 
     @cached_property
     def Constellation_Name(self) -> str:
@@ -489,7 +516,7 @@ class Region(iStaticDataExport):
             None,
         )
 
-    def GetConstellations(self, cache: bool = False) -> List[Constellation]:
+    def GetConstellations(self, cache: bool = True) -> List[Constellation]:
         if hasattr(self, "Constellations"):
             return self.Constellations
         constellations = [
