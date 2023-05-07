@@ -1,15 +1,15 @@
-from models.common import *
+import codecs
+from functools import cached_property
+from pickle import dump, load
+from time import perf_counter
+from typing import Any, Union
+
+import yaml
+from alive_progress import alive_bar
+
 import models.mapv2 as mapData
 from data.planetaryResources import *
-import yaml
-from typing import Any, Union
-import codecs
-from time import perf_counter
-from pickle import dump, load
-from alive_progress import alive_bar
-from functools import cached_property
-
-
+from models.common import *
 
 data_files = {
     "data/regions.en-us.yaml": mapData.Region,
@@ -22,11 +22,10 @@ data_files = {
 }
 
 
-
-
-def LoadYaml(file_name: str)->Any:
-    with codecs.open(file_name, 'r', encoding='utf-8', errors='ignore') as fdata:
+def LoadYaml(file_name: str) -> Any:
+    with codecs.open(file_name, "r", encoding="utf-8", errors="ignore") as fdata:
         return yaml.safe_load(fdata)
+
 
 def CreateMaps(data, obj, client) -> dict:
     if isinstance(data, list):
@@ -36,14 +35,18 @@ def CreateMaps(data, obj, client) -> dict:
         for value in data.values():
             obj(properties=value, client=client)
 
-    
-    
 
-class AllData():
-    def __init__(self, skip_build:bool=False) -> None:
+class AllData:
+    def __init__(self, skip_build: bool = False) -> None:
         self.MapClient = mapData.MapClient()
         self.PickleAttributes = [
-            "Commodities", "Planet_Types", "Planets", "Stargates", "Systems", "Constellations", "Regions"
+            "Commodities",
+            "Planet_Types",
+            "Planets",
+            "Stargates",
+            "Systems",
+            "Constellations",
+            "Regions",
         ]
         if skip_build:
             self.PopulateFromPickles()
@@ -61,52 +64,53 @@ class AllData():
         self.Constellations = self.MapClient.ALL_CONSTELLATIONS
         self.Regions = self.MapClient.ALL_REGIONS
 
-    def GetCommodity(self, value:Union[str, int])->mapData.Commodity:
+    def GetCommodity(self, value: Union[str, int]) -> mapData.Commodity:
         if isinstance(value, str):
             return next(commodity for commodity in self.Commodities if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Commodities if commodity.Id == value)
-        
-    def GetPlanetType(self, value:Union[str, int])->mapData.PlanetType:
+
+    def GetPlanetType(self, value: Union[str, int]) -> mapData.PlanetType:
         if isinstance(value, str):
             return next(commodity for commodity in self.PlanetTypes if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.PlanetTypes if commodity.Id == value)
 
-    def GetPlanet(self, value:Union[str, int])->mapData.Planet:
+    def GetPlanet(self, value: Union[str, int]) -> mapData.Planet:
         if isinstance(value, str):
             return next(commodity for commodity in self.Planets if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Planets if commodity.Id == value)
 
-    def GetStargate(self, value:Union[str, int])->mapData.Stargate:
+    def GetStargate(self, value: Union[str, int]) -> mapData.Stargate:
         if isinstance(value, str):
             return next(commodity for commodity in self.Stargates if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Stargates if commodity.Id == value)
 
-    def GetSystem(self, value:Union[str, int])->mapData.System:
+    def GetSystem(self, value: Union[str, int]) -> mapData.System:
         if isinstance(value, str):
             return next(commodity for commodity in self.Systems if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Systems if commodity.Id == value)
-    
-    def GetConstellation(self, value:Union[str, int])->mapData.Constellation:
+
+    def GetConstellation(self, value: Union[str, int]) -> mapData.Constellation:
         if isinstance(value, str):
             return next(commodity for commodity in self.Constellations if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Constellations if commodity.Id == value)
-    
-    def GetRegion(self, value:Union[str, int])->mapData.Region:
+
+    def GetRegion(self, value: Union[str, int]) -> mapData.Region:
         if isinstance(value, str):
             return next(commodity for commodity in self.Regions if commodity.Name == value)
         if isinstance(value, int):
             return next(commodity for commodity in self.Regions if commodity.Id == value)
-        
-    @cached_property
-    def TotalEdenSystems(self)->int:
-        return len([sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0])
 
+    @cached_property
+    def TotalEdenSystems(self) -> int:
+        return len(
+            [sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0]
+        )
 
     def PickleAll(self):
         print("Picking Data")
@@ -121,16 +125,17 @@ class AllData():
         for attribute in self.PickleAttributes:
             pickle_file_path = f"data/pickled_{attribute.lower()}"
             with open(pickle_file_path, "rb") as pickleFile:
-                un_pickled_data=load(pickleFile)
+                un_pickled_data = load(pickleFile)
                 for item in un_pickled_data:
-                    item.client=self.MapClient
+                    item.client = self.MapClient
                 setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
-                 
+
         print("Map Data Loaded")
+
 
 def BuildMapData(client: mapData.MapClient):
 
-    with alive_bar(title_length=40 ) as bar:
+    with alive_bar(title_length=40) as bar:
         for key, value in data_files.items():
             bar.title(f"Processing {key}")
             yamlFile = LoadYaml(key)
@@ -140,13 +145,8 @@ def BuildMapData(client: mapData.MapClient):
 
         for value in RawResources:
             mapData.Commodity(properties=value, client=client)
-    
 
-     
 
 if __name__ == "__main__":
     data = AllData()
     data.PickleAll()
-
-    
-

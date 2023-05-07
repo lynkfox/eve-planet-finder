@@ -1,14 +1,17 @@
 from __future__ import annotations
-from dataclasses import dataclass, field, fields
-from models.common import *
-from typing import Any, Dict, List, Union
-from pickle import dump, load
-import re
 
-class iStaticDataExport():
-    def Update(self)-> int:
+import re
+from dataclasses import dataclass, field, fields
+from pickle import dump, load
+from typing import Any, Dict, List, Union
+
+from models.common import *
+
+
+class iStaticDataExport:
+    def Update(self) -> int:
         """Returns the ID of the static data object to be used as a key in a dict.
-        
+
         Returns -1 if we want to ignore this entry in the SDE for some reason.
         """
         return NotImplementedError
@@ -21,19 +24,20 @@ class iStaticDataExport():
         """Used to convert into a dict for json purposes or data_frame purposes."""
         output = {}
         for key, value in self.__dict__:
-            
+
             if not key.starswith("_"):
                 if isinstance(value, list):
                     continue
-                output[key]=value
+                output[key] = value
             else:
                 if key.startswith("_pre"):
-                    output[key]=value
+                    output[key] = value
                 continue
         return output
 
+
 @dataclass
-class PotentialSite():
+class PotentialSite:
     SystemName: str
     SystemId: int
     Planets: List[Planet]
@@ -52,28 +56,29 @@ class PotentialSite():
             system_names = [site.SystemName for site in __o]
             system_ids = [site.SystemId for site in __o]
 
-            return (self.SystemId in system_ids and self.SystemName in system_names)
-        
-        return (self.SystemId == __o.SystemId and self.SystemName == __o.SystemName)
-    
-    def __hash__(self) -> int:
-        return hash(self.SystemName+str(self.SystemId))
+            return self.SystemId in system_ids and self.SystemName in system_names
 
-    def __add__(self, right_hand:PotentialSite) -> PotentialSite:
+        return self.SystemId == __o.SystemId and self.SystemName == __o.SystemName
+
+    def __hash__(self) -> int:
+        return hash(self.SystemName + str(self.SystemId))
+
+    def __add__(self, right_hand: PotentialSite) -> PotentialSite:
         new_site = PotentialSite(
             SystemName=self.SystemName,
             SystemId=self.SystemId,
             PlanetType=self.PlanetType,
-            JumpsFromSource=self.JumpsFromSource if self.JumpsFromSource >= right_hand.JumpsFromSource else right_hand.JumpsFromSource,
+            JumpsFromSource=self.JumpsFromSource
+            if self.JumpsFromSource >= right_hand.JumpsFromSource
+            else right_hand.JumpsFromSource,
             SourceSystemName=self.SourceSystemName,
-            Planets=self.Planets.extend(right_hand.Planets)
+            Planets=self.Planets.extend(right_hand.Planets),
         )
         return new_site
 
 
-
 @dataclass
-class AllData():
+class AllData:
     Regions: Dict[int, Region] = field(kw_only=True, default_factory=dict)
     Constellations: Dict[int, Constellation] = field(kw_only=True, default_factory=dict)
     Systems: Dict[int, System] = field(kw_only=True, default_factory=dict)
@@ -92,9 +97,9 @@ class AllData():
             "Planets": self.Planets,
             "PlanetTypes": self.PlanetTypes,
             "RawResources": self.RawResources,
-            "Commodities": self.Commodities
+            "Commodities": self.Commodities,
         }
-    
+
     def PickleData(self):
         print("Picking Data")
         dispatch = self._getDispatch()
@@ -104,32 +109,31 @@ class AllData():
                 dump(value, pickleFile)
         print("Data Pickled")
 
-    def PopulateFromPickles(self)->AllData:
-        output ={}
+    def PopulateFromPickles(self) -> AllData:
+        output = {}
         print("Loading Pickled Data")
         dispatch = self._getDispatch()
         for key in dispatch.keys():
             with open(f"data/pickled_{key.lower()}", "rb") as pickleFile:
-                 output[key]=load(pickleFile)
+                output[key] = load(pickleFile)
         print("Data Loaded")
 
-
         return AllData(**output)
-    
+
 
 @dataclass
 class PIMaterial(iStaticDataExport):
     Name: str = field(kw_only=True, default=0)
     Tier: int = field(kw_only=True, default=0)
-    Id: int  = field(kw_only=True, default=0)
+    Id: int = field(kw_only=True, default=0)
     OnTypes: list[PlanetType] = field(kw_only=True, default_factory=list)
-    Ingredients: list[PIMaterial] =field(kw_only=True, default_factory=list) 
+    Ingredients: list[PIMaterial] = field(kw_only=True, default_factory=list)
     Products: list[PIMaterial] = field(kw_only=True, default_factory=list)
     _pre_types: list[int] = field(kw_only=True, default_factory=list)
     _pre_ingredients: list[int] = field(kw_only=True, default_factory=list)
     _pre_products: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, schematic: Any)-> int:
+    def Update(self, schematic: Any) -> int:
         self.Name = schematic["nameID"]["en"]
         self._pre_ingredients = []
         self._pre_products = []
@@ -155,12 +159,11 @@ class PIMaterial(iStaticDataExport):
                 for resource_id in self._pre_ingredients:
                     if linkMap.get(f"{resource_id}") is not None:
                         self.Products.append(linkMap.get(resource_id))
-            
+
                 return
 
-    
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id, self._pre_ingredients, self._pre_products, self._pre_types)
 
     def __setstate__(self, state):
@@ -171,34 +174,33 @@ class PIMaterial(iStaticDataExport):
         self.OnTypes = []
 
 
-    
-
-
 @dataclass
 class PlanetType(iStaticDataExport):
     Name: str = field(init=False, default="")
     Id: int = field(init=False, default=0)
     PlanetaryIndustryMaterials: list[PIMaterial] = field(init=False, default_factory=list)
 
-    def Update(self, planetType:Any) -> int:
+    def Update(self, planetType: Any) -> int:
         self.Name = planetType["name"]
         self.Id = planetType["type_id"]
         self.PlanetaryIndustryMaterials = []
         return self.Id
-    
+
     def Link(self, planetaryMaterials: dict):
         for value in planetaryMaterials.values():
             if self.Id in value._pre_types:
                 self.PlanetaryIndustryMaterials.append(value)
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id)
 
     def __setstate__(self, state):
         """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
         self.Name, self.Id = state
         self.PlanetaryIndustryMaterials = []
+
+
 @dataclass
 class Planet(iStaticDataExport):
     Name: str = field(init=False, default="")
@@ -208,11 +210,11 @@ class Planet(iStaticDataExport):
     _pre_system_id: list[int] = field(kw_only=True, default_factory=list)
     _pre_type: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, system: Any)-> int:
+    def Update(self, system: Any) -> int:
         self.Name = system["name"]
         self.Id = system["planet_id"]
         self._pre_system_id = system["system_id"]
-        self._pre_type = system["type_id"] 
+        self._pre_type = system["type_id"]
         return self.Id
 
     def Link(self, linkMap: Any):
@@ -223,16 +225,17 @@ class Planet(iStaticDataExport):
             if isinstance(value, System):
                 self.System - linkMap(self._pre_system_id)
                 return
-    
+
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id, self._pre_system_id, self._pre_type)
 
     def __setstate__(self, state):
         """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
-        self.Name, self.Id, self._pre_system_id,self._pre_type = state
+        self.Name, self.Id, self._pre_system_id, self._pre_type = state
         self.Type = None
         self.System = None
+
 
 @dataclass
 class Stargate(iStaticDataExport):
@@ -241,7 +244,7 @@ class Stargate(iStaticDataExport):
     DestinationSystem: System = field(init=False, default=None)
     _pre_destination_id: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, stargate: Any)-> int:
+    def Update(self, stargate: Any) -> int:
         self.Name = stargate["name"]
         self.Id = stargate["stargate_id"]
         self._pre_destination_id = stargate["destination"]["system_id"]
@@ -249,28 +252,33 @@ class Stargate(iStaticDataExport):
 
     def Link(self, systems: dict):
         self.DestinationSystem = systems[self._pre_destination_id]
-        
+
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
-        return (self.Name, self.Id, self._pre_destination_id, )
+        """Ignores the recursive object values of other objects in pickling"""
+        return (
+            self.Name,
+            self.Id,
+            self._pre_destination_id,
+        )
 
     def __setstate__(self, state):
         """Sets the values from the pickle and sets other objects as empty list. Expects LinkMap to be run after"""
         self.Name, self.Id, self._pre_destination_id = state
         self.DestinationSystem = None
+
+
 @dataclass
 class System(iStaticDataExport):
     Name: str = field(init=False, default="")
     Id: int = field(init=False, default=0)
-    Planets: list[Planet]  = field(init=False, default_factory=list)
+    Planets: list[Planet] = field(init=False, default_factory=list)
     Position: Position = field(init=False, default=None)
-    Links: list[System]  = field(init=False, default_factory=list)
+    Links: list[System] = field(init=False, default_factory=list)
     SecurityStatus: float = field(init=False, default=0.0)
     _pre_planets: list[int] = field(kw_only=True, default_factory=list)
     _pre_links: list[int] = field(kw_only=True, default_factory=list)
-    
 
-    def Update(self, system: Any) ->int:
+    def Update(self, system: Any) -> int:
         self.Name = system["name"]
         if re.match(r"AD\d{3}$", self.Name) is not None or re.match(r"V-(\d{3})$", self.Name) is not None:
             return -1
@@ -285,7 +293,9 @@ class System(iStaticDataExport):
             X=system["position"]["x"],
             Y=system["position"]["y"],
             Z=system["position"]["z"],
-            Universe=Universe.WORMHOLE if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"]) else Universe.EDEN
+            Universe=Universe.WORMHOLE
+            if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"])
+            else Universe.EDEN,
         )
 
         return self.Id
@@ -293,21 +303,21 @@ class System(iStaticDataExport):
     def Link(self, linkMap: Any):
         for key, value in linkMap.items():
             if isinstance(value, Stargate) and self._pre_links is not None:
-                
+
                 for stargate_id in self._pre_links:
                     self.Links.append(linkMap[stargate_id].DestinationSystem)
                 return
 
             if isinstance(value, Planet) and self._pre_planets is not None:
                 for planet_data in self._pre_planets:
-                    planet_id = planet_data.get('planet_id')
+                    planet_id = planet_data.get("planet_id")
                     if planet_id is not None:
                         self.Planets.append(linkMap[planet_id])
-                
+
                 return
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id, self._pre_planets, self._pre_links, self.Position)
 
     def __setstate__(self, state):
@@ -321,7 +331,7 @@ class System(iStaticDataExport):
 class Constellation(iStaticDataExport):
     Id: int = field(init=False, default=0)
     Name: str = field(init=False, default="")
-    Systems: list[System]  = field(init=False, default_factory=list)
+    Systems: list[System] = field(init=False, default_factory=list)
     _pre_systems: list[int] = field(kw_only=True, default_factory=list)
 
     def Update(self, constellation: Any) -> int:
@@ -333,12 +343,12 @@ class Constellation(iStaticDataExport):
         self._pre_systems = constellation["systems"]
         return self.Id
 
-    def Link(self, systems:dict ):
+    def Link(self, systems: dict):
         for system_id in self._pre_systems:
             self.Systems.append(systems[system_id])
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id, self._pre_systems)
 
     def __setstate__(self, state):
@@ -346,14 +356,15 @@ class Constellation(iStaticDataExport):
         self.Name, self.Id, self._pre_systems = state
         self.Systems = []
 
+
 @dataclass
 class Region(iStaticDataExport):
     Id: int = field(init=False, default=0)
     Name: str = field(init=False, default="")
-    Constellations: list[Constellation]  = field(init=False, default_factory=list)
+    Constellations: list[Constellation] = field(init=False, default_factory=list)
     _pre_constellations: list[int] = field(kw_only=True, default_factory=list)
 
-    def Update(self, region:Any)-> int:
+    def Update(self, region: Any) -> int:
         self.Name = region["name"]
         if re.match(r"ADR\d{2}", self.Name) is not None or re.match(r"VR-\d{2}", self.Name) is not None:
             return -1
@@ -362,14 +373,13 @@ class Region(iStaticDataExport):
         self._pre_constellations = region["constellations"]
         return self.Id
 
-    def Link(self, constellations:dict):
+    def Link(self, constellations: dict):
 
         for constellation_id in self._pre_constellations:
             self.Constellations.append(constellations[constellation_id])
-    
 
     def __getstate__(self):
-        """Ignores the recursive object values of other objects in pickling """
+        """Ignores the recursive object values of other objects in pickling"""
         return (self.Name, self.Id, self._pre_constellations)
 
     def __setstate__(self, state):
