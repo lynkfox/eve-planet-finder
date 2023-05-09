@@ -6,23 +6,23 @@ from typing import List, Set, Tuple, Union
 
 import numpy
 
-import models.map as mapData
 from models.common import DECIMAL_FORMAT, iWeightFactor, iWeightResult, SecurityStatus
+from models.map.system import System
 
 
 @dataclass
 class PlanetaryIndustryResult(iWeightResult):
     # WeightFactors: PlanetaryIndustryWeightFactor - defined on Parent Class
     # SortValue: Int - defined in Parent class
-    System: mapData.System = field(init=False)
+    System: System = field(init=False)
     PlanetIds: List[int] = field(init=False, default_factory=list)
     JumpsFromOrigin: int = field(init=False)
-    OriginSystem: mapData.System = field(init=False)
+    OriginSystem: System = field(init=False)
     Weight: float = field(init=False)
     IndividualWeights: Tuple[float, float, float, float] = field(init=False)
 
     def Populate(
-        self, current_system: mapData.System, origin_system: mapData.System, jumps_from_source: int, weight: tuple
+        self, current_system: System, origin_system: System, jumps_from_source: int, weight: tuple
     ) -> PlanetaryIndustryResult:
         self.System = current_system
         self.PlanetIds = current_system.Planet_Ids
@@ -58,7 +58,7 @@ class PlanetaryIndustryResult(iWeightResult):
             for planet in self.System.GetPlanets(cache=True)
             if planet.Type_Id in self.WeightFactors.PlanetTypesDesired
         ]
-        planet_counts = Counter([planet.GetType().Name for planet in planets])
+        planet_counts = Counter([planet.Type.Name for planet in planets])
         planet_types_sub_str = " | ".join(sorted([f"{key} x{value}" for key, value in planet_counts.items()]))
 
         if simple:
@@ -122,7 +122,7 @@ class PlanetaryIndustryWeightFactor(iWeightFactor):
     SecurityPreference: SecurityStatus = field(kw_only=True, default=SecurityStatus.HIGH_SEC)
 
     def DetermineSystemWeight(
-        self, system: mapData.System, jumps_from_source: int
+        self, system: System, jumps_from_source: int
     ) -> Tuple[int, Tuple[int, int, int, int], Set[int]]:
         """
         Determines the Weight of hte system:

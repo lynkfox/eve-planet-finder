@@ -1,6 +1,7 @@
 import json
+from itertools import chain
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import networkx as nx
 import plotly.graph_objects as go
@@ -10,14 +11,19 @@ from buildMapData import *
 from calculate.planetary_industry import PlanetaryIndustryResult, PlanetaryIndustryWeightFactor
 from calculate.search_map import WeightCalculator
 from models.common import Universe, WeightMethod
-from models.map import *
+
+if TYPE_CHECKING:
+    from models.map.commodity import Commodity
+    from models.map.galaxy import Constellation, Region
+    from models.map.planet import Planet, PlanetType
+    from models.map.system import Stargate, System
 
 X_POSITION_RELATIVE = 1
 Y_POSITION_RELATIVE = 1
 
 INCLUDE_PLANET_NAMES = False
 
-COMMODITY_TO_TRACK = "Integrity Response Drones"
+COMMODITY_TO_TRACK = "Organic Mortar Applicators"
 
 MAX_JUMPS = 3
 
@@ -66,18 +72,26 @@ class GraphValues:
 def DisplayMap():
     all_data = AllData(skip_build=True)
 
-    raw_resource_ids = next(
-        commodity for commodity in all_data.Commodities if commodity.Name == COMMODITY_TO_TRACK
-    ).GetRawResourceIds(cache=USE_CACHE)
-    planet_types_needed = [
-        ptype
-        for ptype in all_data.Planet_Types
-        if len(set(ptype.RawResources_Ids).intersection(set(raw_resource_ids))) > 0
-    ]
+    commodity_obj = next(
+        commodity for commodity in all_data.Commodities.values() if commodity.Name == COMMODITY_TO_TRACK
+    )
+    raw_resources = commodity_obj.RawResources
+
+    raw_resource_ids = [commodity for commodity in raw_resources.values()]
+    production_chain = commodity_obj.ProductionChainIngredients
+    min_planet_types_needed_in_a_jump_chain = set(
+        chain(*[commodity.PlanetTypes for commodity in raw_resources.values()])
+    )
+
+    possible_pi = None
+    for system in all_data.Systems.values():
+        possible_pi = system.SingleSystemCommodities
+        break
 
     calculator = WeightCalculator(
         WeightFactors=PlanetaryIndustryWeightFactor(
-            PlanetTypesDesired=[ptype.Id for ptype in planet_types_needed],
+            PlanetTypesDesired=min_planet_types_needed_in_a_jump_chain,
+            ProductionChainCommodities=production_chain,
             JumpWeight=50,
             TypeDensityWeight=50,
             TypeDiversityWeight=25,
@@ -86,7 +100,7 @@ def DisplayMap():
         ),
         WeightResults=PlanetaryIndustryResult,
         MaxJumps=MAX_JUMPS,
-        MustFindTargets=set([ptype.Id for ptype in planet_types_needed]),
+        MustFindTargets=min_planet_types_needed_in_a_jump_chain,
     )
 
     graph_values = GraphValuesFactory(calculator)
@@ -178,7 +192,7 @@ def BuildNodesTrace(
     node_text: List[str],
     custom_data: List[tuple],
     hover_template: str,
-    weight: Optional[List(int)] = None,
+    weight: Optional[List[int]] = None,
     marker: Optional[go.scatter.Marker] = None,
 ) -> go.Scatter:
     """
@@ -233,15 +247,13 @@ def GenerateGraphValues(all_data: AllData, calculator: WeightCalculator, graph_v
     systemMap = nx.Graph()
 
     with alive_bar(all_data.TotalEdenSystems, title_length=47) as bar:
-        for system in all_data.Systems:
+        for system in all_data.Systems.values():
             if system.Position.Universe == Universe.WORMHOLE:
                 continue
             if len(system.Stargate_Ids) == 0:
                 continue
 
-            bar.title(
-                f'Analyzing "{system.Constellation_Name}" in the "{system.GetConstellation().Region_Name}" Region'
-            )
+            bar.title(f'Analyzing "{system.Constellation_Name}" in the "{system.Region_Name}" Region')
             bar()
 
             system_weight, weight_details = calculator.Run(system, method=WEIGHTING_METHOD)

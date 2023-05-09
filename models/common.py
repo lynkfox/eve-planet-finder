@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntEnum
 
 DECIMAL_FORMAT = "{:.1f}"
 
@@ -19,6 +19,15 @@ class SecurityStatus(Enum):
 class WeightMethod(Enum):
     AVERAGE = 1
     TOTAL = 2
+    MEAN = 3
+
+
+class PITier(IntEnum):
+    RAW = 0
+    BASIC = 1
+    REFINED = 2
+    SPECIALIZED = 3
+    ADVANCED = 4
 
 
 @dataclass

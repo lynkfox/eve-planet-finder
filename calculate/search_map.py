@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from calculate.planetary_industry import *
 from models.common import WeightMethod
-from models.map import *
+from models.map.system import System
 
 
 @dataclass

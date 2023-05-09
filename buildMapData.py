@@ -2,23 +2,29 @@ import codecs
 from functools import cached_property
 from pickle import dump, load
 from time import perf_counter
-from typing import Any, Union
+from typing import Any, TYPE_CHECKING, Union
 
 import yaml
 from alive_progress import alive_bar
 
-import models.map as mapData
 from data.planetaryResources import *
 from models.common import *
+from models.map.common import MapClient
+
+if TYPE_CHECKING:
+    from models.map.commodity import Commodity
+    from models.map.galaxy import Constellation, Region
+    from models.map.planet import Planet, PlanetType
+    from models.map.system import Stargate, System
 
 data_files = {
-    "data/regions.en-us.yaml": mapData.Region,
-    "data/constellations.en-us.yaml": mapData.Constellation,
-    "data/systems.en-us.yaml": mapData.System,
-    "data/stargates.en-us.yaml": mapData.Stargate,
-    "data/planets.en-us.yaml": mapData.Planet,
-    "data/planetTypes.yaml": mapData.PlanetType,
-    "data/planetSchematics.yaml": mapData.Commodity,
+    "data/regions.en-us.yaml": Region,
+    "data/constellations.en-us.yaml": Constellation,
+    "data/systems.en-us.yaml": System,
+    "data/stargates.en-us.yaml": Stargate,
+    "data/planets.en-us.yaml": Planet,
+    "data/planetTypes.yaml": PlanetType,
+    "data/planetSchematics.yaml": Commodity,
 }
 
 
@@ -38,7 +44,7 @@ def CreateMaps(data, obj, client) -> dict:
 
 class AllData:
     def __init__(self, skip_build: bool = False) -> None:
-        self.MapClient = mapData.MapClient()
+        self.MapClient = MapClient()
         self.PickleAttributes = [
             "Commodities",
             "Planet_Types",
@@ -64,52 +70,56 @@ class AllData:
         self.Constellations = self.MapClient.ALL_CONSTELLATIONS
         self.Regions = self.MapClient.ALL_REGIONS
 
-    def GetCommodity(self, value: Union[str, int]) -> mapData.Commodity:
+    def GetCommodity(self, value: Union[str, int]) -> Commodity:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Commodities if commodity.Name == value)
+            return next(commodity for commodity in self.Commodities.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Commodities if commodity.Id == value)
+            return self.Commodities[value]
 
-    def GetPlanetType(self, value: Union[str, int]) -> mapData.PlanetType:
+    def GetPlanetType(self, value: Union[str, int]) -> PlanetType:
         if isinstance(value, str):
-            return next(commodity for commodity in self.PlanetTypes if commodity.Name == value)
+            return next(commodity for commodity in self.PlanetTypes.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.PlanetTypes if commodity.Id == value)
+            return self.Planet_Types[value]
 
-    def GetPlanet(self, value: Union[str, int]) -> mapData.Planet:
+    def GetPlanet(self, value: Union[str, int]) -> Planet:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Planets if commodity.Name == value)
+            return next(commodity for commodity in self.Planets.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Planets if commodity.Id == value)
+            return self.Planets[value]
 
-    def GetStargate(self, value: Union[str, int]) -> mapData.Stargate:
+    def GetStargate(self, value: Union[str, int]) -> Stargate:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Stargates if commodity.Name == value)
+            return next(commodity for commodity in self.Stargates.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Stargates if commodity.Id == value)
+            return self.Stargates[value]
 
-    def GetSystem(self, value: Union[str, int]) -> mapData.System:
+    def GetSystem(self, value: Union[str, int]) -> System:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Systems if commodity.Name == value)
+            return next(commodity for commodity in self.Systems.values if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Systems if commodity.Id == value)
+            return self.Systems[value]
 
-    def GetConstellation(self, value: Union[str, int]) -> mapData.Constellation:
+    def GetConstellation(self, value: Union[str, int]) -> Constellation:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Constellations if commodity.Name == value)
+            return next(commodity for commodity in self.Constellations.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Constellations if commodity.Id == value)
+            return self.Constellations[value]
 
-    def GetRegion(self, value: Union[str, int]) -> mapData.Region:
+    def GetRegion(self, value: Union[str, int]) -> Region:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Regions if commodity.Name == value)
+            return next(commodity for commodity in self.Regions.values() if commodity.Name == value)
         if isinstance(value, int):
-            return next(commodity for commodity in self.Regions if commodity.Id == value)
+            return self.Regions[value]
 
     @cached_property
     def TotalEdenSystems(self) -> int:
         return len(
-            [sys.Id for sys in self.Systems if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0]
+            [
+                sys.Id
+                for sys in self.Systems.values()
+                if sys.Position.Universe == Universe.EDEN and len(sys.LinkedSystem_Ids) > 0
+            ]
         )
 
     def PickleAll(self):
@@ -126,16 +136,16 @@ class AllData:
             pickle_file_path = f"data/pickled_{attribute.lower()}"
             with open(pickle_file_path, "rb") as pickleFile:
                 un_pickled_data = load(pickleFile)
-                for item in un_pickled_data:
+                for item in un_pickled_data.values():
                     item.client = self.MapClient
                 setattr(self.MapClient, f"ALL_{attribute.upper()}", un_pickled_data)
 
         print("Map Data Loaded")
 
 
-def BuildMapData(client: mapData.MapClient):
+def BuildMapData(client: MapClient):
 
-    with alive_bar(title_length=40) as bar:
+    with alive_bar(len(data_files), title_length=40) as bar:
         for key, value in data_files.items():
             bar.title(f"Processing {key}")
             yamlFile = LoadYaml(key)
@@ -144,7 +154,7 @@ def BuildMapData(client: mapData.MapClient):
             bar()
 
         for value in RawResources:
-            mapData.Commodity(properties=value, client=client)
+            Commodity(properties=value, client=client)
 
 
 if __name__ == "__main__":
