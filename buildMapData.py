@@ -9,13 +9,11 @@ from alive_progress import alive_bar
 
 from data.planetaryResources import *
 from models.common import *
+from models.map.commodity import Commodity
 from models.map.common import MapClient
-
-if TYPE_CHECKING:
-    from models.map.commodity import Commodity
-    from models.map.galaxy import Constellation, Region
-    from models.map.planet import Planet, PlanetType
-    from models.map.system import Stargate, System
+from models.map.galaxy import Constellation, Region
+from models.map.planet import Planet, PlanetType
+from models.map.system import Stargate, System
 
 data_files = {
     "data/regions.en-us.yaml": Region,

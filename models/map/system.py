@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import collections
 import re
 from dataclasses import dataclass, field
 from functools import cached_property
+from itertools import permutations
 from typing import Any, Dict, List, TYPE_CHECKING
 
 from data.planetaryResources import *
@@ -151,57 +153,28 @@ class System(iStaticDataExport):
     @cached_property
     def SingleSystemCommodities(self) -> Dict[PITier, List[int]]:
         tmp = {}
-        reduced_items = [item for item in self.client.ALL_COMMODITIES.values()]  # if item.Tier != PITier.ADVANCED]
-        combinations = {}
-        number_of_planets = len(self.Planet_Ids)
-        if number_of_planets >= 2:
-            combinations[2] = permutations(self.PlanetTypes_Ids, 2)
-        if number_of_planets >= 4:
-            combinations[4] = permutations(self.PlanetTypes_Ids, 4)
-        if number_of_planets >= 5:
-            combinations[5] = permutations(self.PlanetTypes_Ids, 5)
-        if number_of_planets >= 6:
-            combinations[6] = permutations(self.PlanetTypes_Ids, 6)
-        if number_of_planets >= 9:
-            combinations[9] = permutations(self.PlanetTypes_Ids, 9)
+        for commodity in self.client.ALL_COMMODITIES.values():
+            if commodity.Tier == PITier.RAW:
+                for ptype_id in commodity.PlanetType_Ids:
+                    if ptype_id in self.PlanetTypes_Ids:
+                        tmp.setdefault(commodity.Tier, []).append(commodity.Name)
+                        break  # dont care to search the other planets
 
-        if number_of_planets >= 12:
-            combinations[12] = permutations(self.PlanetTypes_Ids, 12)
+            else:
 
-        if number_of_planets >= 18:
-            combinations[18] = permutations(self.PlanetTypes_Ids, 18)
-
-        for key, value in combinations.items():
-            tmp = []
-            for item in value:
-                tmp.append(hash(str(item)))
-            combinations[key] = tmp
-
-        temp = {}
-        for commodity in reduced_items:
-            number_of_commodity_planets = len(commodity.RawResources_Ids)
-            if number_of_commodity_planets <= number_of_planets and number_of_commodity_planets > 1:
-                for value in combinations[number_of_commodity_planets]:
-                    if commodity.HashedPermutations.get(value, None) is not None:
-                        temp.setdefault(commodity.Tier, []).append(commodity.Name)
-                        break
-            if number_of_commodity_planets == 1:
-                if any(item in commodity.PlanetTypeId_Permutations[0] for item in self.PlanetTypes_Ids):
-                    temp.setdefault(commodity.Tier, []).append(commodity.Name)
-                    break
-
-            # for set_of_planets in commodity.PlanetTypeId_Permutations:
-
-            #     if commodity.Tier == PITier.RAW:
-            #         if any( item in self.PlanetTypes_Ids for item in commodity.PlanetTypeId_Permutations):
-            #             tmp.setdefault(commodity.Tier, []).append(commodity.Name)
-
-            #     elif all( item in self.PlanetTypes_Ids for item in set_of_planets):
-            #         tmp.setdefault(commodity.Tier, []).append(commodity.Name)
-
-            #     break
-
-        return temp
+                number_of_planets_needed = len(
+                    [resource for resource in commodity.ProductionChainRawResources if resource.Tier == PITier.RAW]
+                )
+                if number_of_planets_needed > len(self.Planet_Ids):
+                    pass
+                else:
+                    sorted_planet_types = sorted(self.PlanetTypes_Ids)
+                    planet_sets = list(permutations(sorted_planet_types, number_of_planets_needed))
+                    for possibility in planet_sets:
+                        if possibility in commodity.PlanetTypePermutations:
+                            tmp.setdefault(commodity.Tier, []).append(commodity.Name)
+                            break
+        return tmp
 
     def __getstate__(self):
         return (

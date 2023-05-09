@@ -10,7 +10,7 @@ from __future__ import annotations
 # 2017 - Storm
 # 2063 - Plasma
 
-# Matches the ID of the Raw Resource to the Planet Types it can be foudn on
+# Matches the ID of the Raw Resource to the Planet Types it can be found on
 RAW_RESOURCE_TO_TYPE = {
     2268: [2016, 13, 12, 2014, 11, 2017],
     2305: [11],

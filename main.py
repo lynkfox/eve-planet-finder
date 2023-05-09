@@ -9,13 +9,12 @@ from models.common import Universe, WeightMethod
 if __name__ == "__main__":
     data = AllData(skip_build=True)
 
-    with alive_bar(data.TotalEdenSystems, title_length=47) as bar:
-        for system in data.Systems.values():
-            if system.Position.Universe == Universe.WORMHOLE:
-                continue
-            if len(system.Stargate_Ids) == 0:
-                continue
+    commodity = data.GetCommodity("Organic Mortar Applicators")
+    value = commodity.PlanetTypePermutations
+    print(value)
 
-            system.SingleSystemCommodities
-            bar.title(f'Analyzing "{system.Constellation_Name}" in the "{system.Region_Name}" Region')
-            bar()
+    # with alive_bar(data.TotalEdenSystems, title_length=47) as bar:
+    #     for system in data.Systems.values():
+    #         bar.title(f'{system.Name}#{system.Id}')
+    #         system_commodities = system.SingleSystemCommodities
+    #         bar()

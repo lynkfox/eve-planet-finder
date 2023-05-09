@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
+from itertools import product
+from typing import Any, Dict, List, TYPE_CHECKING, Union
 
 from data.planetaryResources import *
 from models.common import PITier
 from models.map.common import iStaticDataExport, MapClient
 
 if TYPE_CHECKING:
-    from models.map.planet import Planet, PlanetType
+    from models.map.planet import PlanetType
 
 
 @dataclass
@@ -35,18 +36,33 @@ class Commodity(iStaticDataExport):
         self.client.ALL_COMMODITIES[self.Id] = self
 
     @cached_property
-    def PlanetType_Ids(self) -> List[int]:
+    def PlanetType_Ids(self) -> Union[Dict[int, List[int]], List[int]]:
+        """
+        If the resource is a P0 category (PITier.RAW) then return a list of the planet types ids needed.
+        Otherwise returns a map of RawResource.Id: [PlanetType.Id]
+
+        This does not keep track of Duplicates!
+        """
         if self.Tier == PITier.RAW:
-            return RAW_RESOURCE_TO_TYPE[self.Id]
-        else:
-            return []
+            return [ptype.Id for ptype in self.PlanetTypes]
+
+        return {key: resource.PlanetType_Ids for key, resource in self.RawResources.items()}
 
     @cached_property
-    def PlanetTypes(self) -> Dict[int, PlanetType]:
+    def PlanetTypes(self) -> Union[Dict[int, List[PlanetType]], List[PlanetType]]:
+        """
+        If the resource is a P0 category (PITier.RAW) then return a list of the planet types needed.
+        Otherwise returns a map of RawResource.Id: [PlanetType] for each P0 resource needed.
+
+        This does not keep track of Duplicates!
+        """
         if self.Tier == PITier.RAW:
-            return {ptype_id: self.client.ALL_PLANET_TYPES[ptype_id] for ptype_id in RAW_RESOURCE_TO_TYPE[self.Id]}
-        else:
-            return []
+            return [self.client.ALL_PLANET_TYPES[ptype_id] for ptype_id in RAW_RESOURCE_TO_TYPE[self.Id]]
+
+        if self.Tier == PITier.BASIC:
+            return [ptype.Id for ptype in self.client.ALL_COMMODITIES[self.Ingredient_Ids[0]]]
+
+        return {key: resource.PlanetTypes for key, resource in self.RawResources.items()}
 
     @cached_property
     def Ingredient_Names(self) -> List[str]:
@@ -54,14 +70,29 @@ class Commodity(iStaticDataExport):
 
     @cached_property
     def Ingredients(self) -> Dict[int, Commodity]:
+        """
+        Returns a map of Commodity.Id:Commodity for each resource used to add to this.
+        """
         return {ingr_id: self.client.ALL_COMMODITIES[ingr_id] for ingr_id in self.Ingredient_Ids}
 
     @cached_property
-    def RawResources_Ids(self, cache: bool = True) -> List[int]:
-        return [raw_id for raw_id in self.RawResources]
+    def RawResources_Ids(self) -> List[int]:
+        """
+        Returns a list of Commodity.Id for all the P0 commodities that ultimately make up this  resource.
+
+        This value IGNORES DUPLICATES that may occur in the chain. For a complete map that does not ignore duplicates, use
+        self.ProductionChainIngredients
+        """
+        return self.RawResources.keys()
 
     @cached_property
     def RawResources(self) -> Dict[int, Commodity]:
+        """
+        Returns a map of Commodity.Id: Commodity for all the P0 commodities that ultimately make up this  resource.
+
+        This value IGNORES DUPLICATES that may occur in the chain. For a complete map that does not ignore duplicates, use
+        self.ProductionChainIngredients
+        """
         temp = {}
 
         for ingredient in self.Ingredients.values():
@@ -90,41 +121,53 @@ class Commodity(iStaticDataExport):
         return tmp
 
     @cached_property
-    def PlanetTypeId_Permutations(self) -> List[Tuple[int]]:
+    def ProductionChainRawResources(self) -> List[Commodity]:
         """
-        All permutations of planet type ids that would let you produce this ingredient, assuming 1 planet per raw resource
-
-        e.g.
-
-        Consumer Electronics (tier: Specialized) needs Toxic Metals and Chiral Structures.
-        Toxic metals can be produced on Ice, Lava, and Plasma. Chiral Structures can be produced on Lava and Plasma.
-        Combinations of planet types that would allow you to produce Consumer Electronics in a single system would then be:
-        (Ice, Lava), (Lava, Lava), (Plasma, Lava), (Plasma, Plasma)
+        Returns a list, duplicities included, of all the raw resources that would be needed to produce this commodity.
         """
+        tmp = []
+        for value in self.ProductionChainIngredients.values():
+            tmp.extend(value)
 
-        # do the initial calculation for the lowest pont as a 2D Matrix
-        if self.Tier == PITier.REFINED:
-            planet_types_by_raw = {raw.Name: raw.PlanetTypes for raw in self.RawResources.values()}
-            matrix_of_ids = []
-
-            for value in planet_types_by_raw.values():
-                matrix_of_ids.append([ptype.Id for ptype in value.values()])
-
-            return list(product(*matrix_of_ids))
-        elif self.Tier == PITier.BASIC:
-            return [item.PlanetType_Ids for item in self.Ingredients.values()]
-        elif self.Tier == PITier.RAW:
-            return self.PlanetType_Ids
-        else:
-            tmp = []
-            for ingredient in self.Ingredients.values():
-                tmp.append(ingredient.PlanetTypeId_Permutations)
-
-            return list(product(*tmp))
+        return tmp
 
     @cached_property
-    def HashedPermutations(self):
-        return {hash(str(item)): item for item in self.PlanetTypeId_Permutations}
+    def PlanetTypePermutations(self) -> List[list]:
+
+        if self.Tier == PITier.BASIC:
+            return [ptypeid.PlanetType_Ids for ptypeid in self.RawResources.values()][0]
+
+        ingredients = []
+
+        for ingredient in self.Ingredients.values():
+            if self.Tier == PITier.ADVANCED and ingredient.Tier == PITier.BASIC:
+                values = ingredient.PlanetTypePermutations
+                values = [[ptype_id] for ptype_id in values]
+                ingredients.append(values)
+            else:
+                ingredients.append(ingredient.PlanetTypePermutations)
+        # ingredients = [ingredient.PlanetTypePermutations for ingredient in self.Ingredients.values()]
+        all_combinations = product(*ingredients)
+
+        return self._flatten(all_combinations, self.Tier.value)
+
+    def _flatten(self, all_combinations, tier):
+        if not isinstance(all_combinations, list):
+            all_combinations = list(all_combinations)
+
+        if isinstance(all_combinations[0], int):
+            return all_combinations
+
+        else:
+            tmp = []
+            for value in all_combinations:
+                sub_value = self._flatten(value, tier - 1)
+                if tier < self.Tier:
+                    tmp.extend(sub_value)
+                else:
+                    tmp.append(sub_value)
+
+            return tmp
 
     def _determineTier(self):
 
@@ -138,7 +181,7 @@ class Commodity(iStaticDataExport):
             self.Tier = PITier.BASIC
 
     def __repr__(self) -> str:
-        return f"Commodity( Name={self.Name}#{self.Id}, Tier={self.Tier}, Ingredients={self.IngredientNames} )"
+        return f"Commodity( Name={self.Name}#{self.Id}, Tier={self.Tier}, Ingredients={self.Ingredient_Names} )"
 
     def __getstate__(self):
         return (self.Name, self.Id, self.Tier, self.Ingredient_Ids)
