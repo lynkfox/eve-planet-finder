@@ -195,7 +195,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
-            self.SingleSystemCommodities,
+            # self.SingleSystemCommodities,
         )
 
     def __setstate__(self, state):
@@ -207,7 +207,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
-            self.SingleSystemCommodities,
+            # self.SingleSystemCommodities,
         ) = state
 
     def __repr__(self) -> str:
