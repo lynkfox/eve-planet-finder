@@ -5,6 +5,8 @@ from functools import cached_property
 from itertools import product
 from typing import Any, Dict, List, TYPE_CHECKING, Union
 
+from pandas import DataFrame
+
 from data.planetaryResources import *
 from models.common import PITier
 from models.map.common import iStaticDataExport, MapClient
@@ -126,10 +128,15 @@ class Commodity(iStaticDataExport):
         Returns a list, duplicities included, of all the raw resources that would be needed to produce this commodity.
         """
         tmp = []
-        for value in self.ProductionChainIngredients.values():
-            tmp.extend(value)
+        for value in self.ProductionChainIngredients[PITier.RAW]:
+
+            tmp.append(value)
 
         return tmp
+
+    @cached_property
+    def PlanetTypePermutationsDF(self) -> DataFrame:
+        return DataFrame([sorted(v) for v in self.PlanetTypePermutations])
 
     @cached_property
     def PlanetTypePermutations(self) -> List[list]:

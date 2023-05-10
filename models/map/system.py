@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import collections
 import re
-from dataclasses import dataclass, field
+import shelve
+from dataclasses import dataclass, field, InitVar
 from functools import cached_property
 from itertools import permutations
 from typing import Any, Dict, List, TYPE_CHECKING
 
+import numpy
+
 from data.planetaryResources import *
 from models.common import PITier, Position, Universe
-from models.map.common import iStaticDataExport, MapClient
+from models.map.common import iStaticDataExport
 
 if TYPE_CHECKING:
     from models.map.commodity import Commodity
@@ -153,8 +155,10 @@ class System(iStaticDataExport):
     @cached_property
     def SingleSystemCommodities(self) -> Dict[PITier, List[int]]:
         tmp = {}
+        sorted_planet_types = sorted(self.PlanetTypes_Ids)
+        planet_sets = PlanetPermutations(sorted_planet_types)
         for commodity in self.client.ALL_COMMODITIES.values():
-            if commodity.Tier == PITier.RAW:
+            if commodity.Tier == PITier.RAW or commodity.Tier == PITier.BASIC:
                 for ptype_id in commodity.PlanetType_Ids:
                     if ptype_id in self.PlanetTypes_Ids:
                         tmp.setdefault(commodity.Tier, []).append(commodity.Name)
@@ -162,16 +166,13 @@ class System(iStaticDataExport):
 
             else:
 
-                number_of_planets_needed = len(
-                    [resource for resource in commodity.ProductionChainRawResources if resource.Tier == PITier.RAW]
-                )
+                number_of_planets_needed = len([resource for resource in commodity.ProductionChainRawResources])
                 if number_of_planets_needed > len(self.Planet_Ids):
                     pass
                 else:
-                    sorted_planet_types = sorted(self.PlanetTypes_Ids)
-                    planet_sets = list(permutations(sorted_planet_types, number_of_planets_needed))
-                    for possibility in planet_sets:
-                        if possibility in commodity.PlanetTypePermutations:
+
+                    for possibility in planet_sets.Dispatch[number_of_planets_needed]:
+                        if (commodity.PlanetTypePermutationsDF == possibility).all(1).any():
                             tmp.setdefault(commodity.Tier, []).append(commodity.Name)
                             break
         return tmp
@@ -185,6 +186,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
+            # self.SingleSystemCommodities
         )
 
     def __setstate__(self, state):
@@ -196,7 +198,20 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
+            # self.SingleSystemCommodities
         ) = state
 
     def __repr__(self) -> str:
         return f"System( Name={self.Name}#{self.Id}, Universe={self.Position.Universe.name}, Constellation={self.Constellation_Name}#{self.Constellation_Id} )"
+
+
+@dataclass
+class PlanetPermutations:
+    planets: InitVar[List[int]]
+    Dispatch: Dict[int, list] = field(init=False, default_factory=dict)
+
+    def __post_init__(self, planets):
+        for value in [2, 4, 6, 8, 12, 18]:
+            if value > len(planets):
+                break
+            self.Dispatch[value] = [numpy.array(v) for v in list(permutations(planets, value))]

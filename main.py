@@ -1,4 +1,7 @@
+import numpy
 from alive_progress import alive_bar
+from IPython.display import display
+from pandas import DataFrame
 
 from buildMapData import AllData
 from calculate.full_map_values import CalculatedMapData
@@ -9,12 +12,12 @@ from models.common import Universe, WeightMethod
 if __name__ == "__main__":
     data = AllData(skip_build=True)
 
-    commodity = data.GetCommodity("Organic Mortar Applicators")
-    value = commodity.PlanetTypePermutations
-    print(value)
+    sys = data.GetSystem("Sasta")
+    values = sys.SingleSystemCommodities
+    pass
 
     # with alive_bar(data.TotalEdenSystems, title_length=47) as bar:
     #     for system in data.Systems.values():
     #         bar.title(f'{system.Name}#{system.Id}')
-    #         system_commodities = system.SingleSystemCommodities
     #         bar()
+    #         system_commodities = system.SingleSystemCommodities

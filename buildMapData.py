@@ -94,7 +94,7 @@ class AllData:
 
     def GetSystem(self, value: Union[str, int]) -> System:
         if isinstance(value, str):
-            return next(commodity for commodity in self.Systems.values if commodity.Name == value)
+            return next(commodity for commodity in self.Systems.values() if commodity.Name == value)
         if isinstance(value, int):
             return self.Systems[value]
 
@@ -157,4 +157,12 @@ def BuildMapData(client: MapClient):
 
 if __name__ == "__main__":
     data = AllData()
+
+    with alive_bar(data.TotalEdenSystems, title_length=40) as bar:
+        for system in data.Systems.values():
+            if system.Position.Universe == Universe.EDEN and len(system.LinkedSystem_Ids) > 0:
+                bar.title(f"Pre-seeding Commodities: {system.Name}#{system.Id}")
+                system.SingleSystemCommodities
+                bar()
+
     data.PickleAll()
