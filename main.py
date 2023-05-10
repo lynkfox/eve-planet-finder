@@ -14,6 +14,7 @@ if __name__ == "__main__":
 
     sys = data.GetSystem("Sasta")
     values = sys.SingleSystemCommodities
+    print(values)
     pass
 
     # with alive_bar(data.TotalEdenSystems, title_length=47) as bar:

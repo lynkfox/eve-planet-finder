@@ -8,6 +8,8 @@ from itertools import permutations
 from typing import Any, Dict, List, TYPE_CHECKING
 
 import numpy
+from alive_progress import alive_bar
+from pandas import DataFrame
 
 from data.planetaryResources import *
 from models.common import PITier, Position, Universe
@@ -170,12 +172,19 @@ class System(iStaticDataExport):
                 if number_of_planets_needed > len(self.Planet_Ids):
                     pass
                 else:
+                    result = planet_sets.Dispatch[number_of_planets_needed].merge(
+                        commodity.PlanetTypePermutationsDF, how="inner", indicator=False
+                    )
 
-                    for possibility in planet_sets.Dispatch[number_of_planets_needed]:
-                        if (commodity.PlanetTypePermutationsDF == possibility).all(1).any():
-                            tmp.setdefault(commodity.Tier, []).append(commodity.Name)
-                            break
-        return tmp
+                    if len(result) > 0:
+                        tmp.setdefault(commodity.Tier, []).append(commodity.Name)
+                    del result
+                    # for possibility in planet_sets.Dispatch.get(number_of_planets_needed, []):
+                    #     if (commodity.PlanetTypePermutationsDF == possibility).all(1).any():
+                    #         tmp.setdefault(commodity.Tier, []).append(commodity.Name)
+                    #         break
+
+            return tmp
 
     def __getstate__(self):
         return (
@@ -186,7 +195,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
-            # self.SingleSystemCommodities
+            self.SingleSystemCommodities,
         )
 
     def __setstate__(self, state):
@@ -198,7 +207,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
-            # self.SingleSystemCommodities
+            self.SingleSystemCommodities,
         ) = state
 
     def __repr__(self) -> str:
@@ -208,10 +217,11 @@ class System(iStaticDataExport):
 @dataclass
 class PlanetPermutations:
     planets: InitVar[List[int]]
-    Dispatch: Dict[int, list] = field(init=False, default_factory=dict)
+    Dispatch: Dict[int, DataFrame] = field(init=False, default_factory=dict)
 
     def __post_init__(self, planets):
-        for value in [2, 4, 6, 8, 12, 18]:
-            if value > len(planets):
-                break
-            self.Dispatch[value] = [numpy.array(v) for v in list(permutations(planets, value))]
+        options = [2, 4, 6, 8, 9, 12, 18]
+        for value in options:
+
+            if value <= len(planets):
+                self.Dispatch[value] = DataFrame([numpy.array(v) for v in list(permutations(planets, value))])
