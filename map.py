@@ -147,12 +147,8 @@ def QuickMap(
                     y=value.node_y,
                     text=value.node_names,
                     mode="markers",
-                    marker=go.scatter.Marker(
-                        size=12,
-                        autocolorscale=False,
-                        color=value.node_weight,
-                        line=go.scatter.marker.Line(width=2, color="black"),
-                    ),
+                    opacity=0.5,
+                    marker=second_formatting.marker(value.node_weight),
                 )
             )
 
@@ -166,12 +162,7 @@ def QuickMap(
                 y=value.node_y,
                 text=value.node_names,
                 mode="markers",
-                marker=go.scatter.Marker(
-                    size=10,
-                    autocolorscale=False,
-                    color=value.node_weight,
-                    line=go.scatter.marker.Line(width=2, color="black"),
-                ),
+                marker=formatting.marker(value.node_weight),
             )
         )
 
@@ -230,9 +221,12 @@ if __name__ == "__main__":
     AnokisData = GetAnokisData()
     weather = list(set([system.weather for system in AnokisData if system.weather is not None]))
     weather.append("None")
+    static_types = {f"Class: {system.wh_class} - Static {system.statics}" for system in AnokisData}
     # WormholeClassFormatting.color_map = generate_distinct_colorings(keys=["C1", "C2", "C3", "C4", "C5", "C6", "C13", "Thera", "Drifter"], )
     # WormholeWeatherFormatting.color_map = generate_distinct_colorings(keys=weather, existing=WormholeClassFormatting.color_map, pastel_factor=True)
-    # WormholeStaticFormatting.color_map = generate_distinct_colorings(keys=static_types)
+    WormholeStaticFormatting.color_map = generate_distinct_colorings(
+        keys=static_types, existing=WormholeClassFormatting.color_map, pastel_factor=True
+    )
     WormholeClassFormatting.anokis_map = {system.name: system for system in AnokisData}
     WormholeStaticFormatting.anokis_map = WormholeClassFormatting.anokis_map
     WormholeWeatherFormatting.anokis_map = WormholeClassFormatting.anokis_map
@@ -240,11 +234,9 @@ if __name__ == "__main__":
     QuickMap(
         all_data,
         include_universe=[Universe.WORMHOLE],
-        formatting=WormholeWeatherFormatting,
+        formatting=WormholeStaticFormatting,
         second_formatting=WormholeClassFormatting,
         include_jump_names=False,
     )
 
-    print(WormholeClassFormatting.color_map)
-
-    print(WormholeWeatherFormatting.color_map)
+    print(WormholeStaticFormatting.color_map)
