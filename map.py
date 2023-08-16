@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List
 
 import networkx as nx
@@ -61,6 +62,8 @@ def QuickMap(
     systemMap = nx.Graph()
     graph_values = GraphValues()
     existing_lines = []
+    special_names = []
+    special_weights = []
 
     for system in all_data.Systems:
         if system.Position.Universe not in include_universe:
@@ -68,6 +71,10 @@ def QuickMap(
 
         systemMap.add_node(system.Name)
         graph_values.node_names.append(formatting.node_naming(system))
+        ## extra
+        special_names.append(WormholeClassFormatting.node_naming(system))
+        special_weights.append(WormholeClassFormatting.node_coloring(system))
+        ##
         graph_values.node_x.append(system.Position.X / X_POSITION_RELATIVE)
         graph_values.node_y.append(system.Position.Y / Y_POSITION_RELATIVE)
         graph_values.node_weight.append(formatting.node_coloring(system))
@@ -92,6 +99,7 @@ def QuickMap(
                     graph_values.edge_marker.append(build_edge_text_point(system, destination))
 
     color_coded_values = break_into_color_groups(formatting.color_map, graph_values)
+
     all_traces = []
 
     # System Connection Lines
@@ -123,6 +131,29 @@ def QuickMap(
                     line=go.scatter.marker.Line(width=0.4, color="#777"),
                     size=8,
                     color="#A921E1",
+                ),
+            )
+        )
+
+    ## EXTRA REMOVE THIS
+    new_graph = deepcopy(graph_values)
+    new_graph.node_names = special_names
+    new_graph.node_weight = special_weights
+    wh_class = break_into_color_groups(WormholeClassFormatting.color_map, new_graph)
+
+    for key, value in wh_class.items():
+        all_traces.append(
+            go.Scatter(
+                name=key,
+                x=value.node_x,
+                y=value.node_y,
+                text=value.node_names,
+                mode="markers",
+                marker=go.scatter.Marker(
+                    size=12,
+                    autocolorscale=False,
+                    color=value.node_weight,
+                    line=go.scatter.marker.Line(width=2, color="black"),
                 ),
             )
         )
