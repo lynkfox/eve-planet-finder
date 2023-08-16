@@ -2,6 +2,15 @@
 
 * Python3.10
 
+# Use:
+
+use `python map.py` to generate a map.
+
+Currently, have to go in and manually change the Formatter and Universes on map.py line 205
+
+see map/formater.py for different formatters, and the universes are Universe.ABYSS, Universe.EDEN, Universe.JOVIAN, Universe.WORMHOLE
+
+
 # Contributing
 # `python buildMapData.py`
 
