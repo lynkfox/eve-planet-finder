@@ -45,11 +45,11 @@ class GraphValues:
         self.node_z = []
         self.node_names = []
         self.node_custom_data = []
+        self.node_weight = []
+        self.node_text = []
         self.edge_x = []
         self.edge_y = []
         self.edge_z = []
-        self.node_weight = []
-        self.node_text = []
         self.top_weight = 0
         self.top_system = []
         self.top_values = {}

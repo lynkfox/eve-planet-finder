@@ -8,6 +8,8 @@ class Universe(Enum):
     EDEN = 1
     WORMHOLE = 2
     JOVIAN = 3
+    V_SYS = 4
+    ABYSS = 5
 
 
 class SecurityStatus(Enum):

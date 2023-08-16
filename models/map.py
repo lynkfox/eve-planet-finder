@@ -274,6 +274,7 @@ class System(iStaticDataExport):
     Planet_Ids: List[int] = field(kw_only=True, default_factory=list)
     Stargate_Ids: List[int] = field(kw_only=True, default_factory=list)
     Constellation_Id: int = field(kw_only=True, default=0)
+    Region_Id: int = field(kw_only=True, default=0)
 
     def __post_init__(self, properties: Dict[str, Any]):
         if properties is not None:
@@ -288,21 +289,31 @@ class System(iStaticDataExport):
             self.Security_Status = properties["security_status"]
             self.Constellation_Id = properties["constellation_id"]
 
-            # non accessible constellation, so dont add this system to the general list
-            if self.Constellation_Id == 20000062:
-                return
+            # # non accessible constellation, so dont add this system to the general list
+            # if self.Constellation_Id == 20000062:
+            #     return
 
             self.Position = Position(
                 X=properties["position"]["x"],
                 Y=properties["position"]["y"],
                 Z=properties["position"]["z"],
-                Universe=Universe.WORMHOLE
-                if (re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"])
-                else Universe.EDEN,
+                Universe=Universe.EDEN,
             )
 
-        if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
-            self.client.ALL_SYSTEMS.append(self)
+            if re.match(r"J\d{6}", self.Name) is not None or self.Name in ["Thera", "J1226-0"]:
+                self.Position.Universe = Universe.WORMHOLE
+
+            elif re.match(r"AD\d{3}", self.Name) is not None:
+                self.Position.Universe = Universe.ABYSS
+
+            elif self.Region_Id == 20000062:
+                self.Position.Universe = Universe.JOVIAN
+
+            elif re.match(r"V-\d{3}", self.Name) is not None:
+                self.Position.Universe = Universe.V_SYS
+
+        # if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
+        self.client.ALL_SYSTEMS.append(self)
 
     @cached_property
     def Stargate_Names(self) -> List[str]:
@@ -342,7 +353,8 @@ class System(iStaticDataExport):
                 constellation.Region_Name
                 for constellation in self.client.ALL_CONSTELLATIONS
                 if self.Constellation_Id == constellation.Id
-            )
+            ),
+            None,
         )
 
     def GetStargates(self, cache: bool = False) -> List[Stargate]:
@@ -371,6 +383,7 @@ class System(iStaticDataExport):
     def GetConstellation(self, cache: bool = False) -> Constellation:
         if hasattr(self, "Constellation"):
             return self.Constellation
+
         constellation = next(
             (constellation for constellation in self.client.ALL_CONSTELLATIONS if self.Id in constellation.System_Ids),
             None,
@@ -378,6 +391,20 @@ class System(iStaticDataExport):
         if cache:
             self.Constellation = constellation
         return constellation
+
+    def GetRegion(self, cache: bool = False) -> Region:
+        if hasattr(self, "Region"):
+            return self.Region
+
+        if hasattr(self, "Region_Name"):
+            region = next((region for region in self.client.ALL_REGIONS if region.Name == self.Region_Name), None)
+        else:
+            region = next((region for region in self.client.ALL_REGIONS if self.Constellation_Id))
+
+        if cache:
+            self.Region = region
+
+        return region
 
     def __getstate__(self):
         return (
@@ -415,10 +442,6 @@ class Constellation(iStaticDataExport):
             self.System_Ids = properties.get("systems", [])
             self.Region_Id = properties["region_id"]
 
-            # non accessible constellation
-            if self.Id == 20000062:
-                return
-
             self.Position = Position(
                 X=properties["position"]["x"],
                 Y=properties["position"]["y"],
@@ -426,8 +449,11 @@ class Constellation(iStaticDataExport):
                 Universe=Universe.EDEN,
             )
 
-        if re.match(r"ADC\d{2}", self.Name) is None and re.match(r"VC-\d{3}", self.Name) is None:
-            self.client.ALL_CONSTELLATIONS.append(self)
+            if self.Id == 20000062:
+                self.Position.Universe = Universe.JOVIAN
+
+        # if re.match(r"ADC\d{2}", self.Name) is None and re.match(r"VC-\d{3}", self.Name) is None:
+        self.client.ALL_CONSTELLATIONS.append(self)
 
     @cached_property
     def Region_Name(self) -> str:
@@ -475,8 +501,8 @@ class Region(iStaticDataExport):
             self.Id = properties["region_id"]
             self.Constellation_Ids = properties.get("constellations", [])
 
-        if re.match(r"ADR\d{2}", self.Name) is None and re.match(r"VR-\d{2}", self.Name) is None:
-            self.client.ALL_REGIONS.append(self)
+        # if re.match(r"ADR\d{2}", self.Name) is None and re.match(r"VR-\d{2}", self.Name) is None:
+        self.client.ALL_REGIONS.append(self)
 
     @cached_property
     def Constellation_Name(self) -> str:
