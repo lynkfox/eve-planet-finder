@@ -35,9 +35,14 @@ class AnokisSystem:
 def AnokisFactory(system_tree):
     name = system_tree.find("a", attrs={"class": "system-link"}).text
     wh_class = system_tree.find("span", attrs={"class": "wormholeclass"}).text
-    statics = system_tree.find("span", attrs={"class": "statics"}).text.replace(" ", "").replace("statics", "")
+    statics = (
+        system_tree.find("span", attrs={"class": "statics"})
+        .text.replace(" ", "")
+        .replace("statics", "")
+        .replace("static", "")
+    )
     weather_node = system_tree.find("span", attrs={"class": "effect"})
-    weather = None if weather_node is None else weather_node.text
+    weather = None if weather_node is None else weather_node.text.replace(" ", "").replace("\n", "")
 
     return AnokisSystem(name, wh_class, statics, weather)
 

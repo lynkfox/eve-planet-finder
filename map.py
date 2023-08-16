@@ -18,12 +18,6 @@ PICKLE_GRAPH_DATA = True  # If True will cause the simulation to be run and any 
 PICKLE_FILE_PATH = f"data/pickled_graph_general".replace(" ", "_").lower()
 
 
-def generate_distinct_colorings(keys: list) -> dict:
-    colors = distinctipy.get_colors(len(keys))
-
-    return dict(zip(keys, [distinctipy.get_hex(c) for c in colors]))
-
-
 def constellation_system_name(system: System):
     return f"{system.GetConstellation().Name}: {system.Name}"
 
@@ -56,8 +50,12 @@ def QuickMap(
     all_data: AllData,
     include_universe: List[Universe] = [],
     formatting: iDisplayFormatting = DefaultFormatting,
+    second_formatting: iDisplayFormatting = None,
     include_jump_names: bool = True,
 ):
+    """
+    see map.formatting.py for Formatting classes.  Second formatting will be "under" the standard formatting, useful for broader categories
+    """
 
     systemMap = nx.Graph()
     graph_values = GraphValues()
@@ -70,14 +68,14 @@ def QuickMap(
             continue
 
         systemMap.add_node(system.Name)
-        graph_values.node_names.append(formatting.node_naming(system))
-        ## extra
-        special_names.append(WormholeClassFormatting.node_naming(system))
-        special_weights.append(WormholeClassFormatting.node_coloring(system))
-        ##
         graph_values.node_x.append(system.Position.X / X_POSITION_RELATIVE)
         graph_values.node_y.append(system.Position.Y / Y_POSITION_RELATIVE)
+        graph_values.node_names.append(formatting.node_naming(system))
         graph_values.node_weight.append(formatting.node_coloring(system))
+        if second_formatting is not None:
+            special_names.append(second_formatting.node_naming(system))
+            special_weights.append(second_formatting.node_coloring(system))
+
         if system.Position.Universe == Universe.EDEN:
             system.GetLinkedSystems()
 
@@ -135,28 +133,28 @@ def QuickMap(
             )
         )
 
-    ## EXTRA REMOVE THIS
-    new_graph = deepcopy(graph_values)
-    new_graph.node_names = special_names
-    new_graph.node_weight = special_weights
-    wh_class = break_into_color_groups(WormholeClassFormatting.color_map, new_graph)
+    if second_formatting is not None:
+        new_graph = deepcopy(graph_values)
+        new_graph.node_names = special_names
+        new_graph.node_weight = special_weights
+        wh_class = break_into_color_groups(second_formatting.color_map, new_graph)
 
-    for key, value in wh_class.items():
-        all_traces.append(
-            go.Scatter(
-                name=key,
-                x=value.node_x,
-                y=value.node_y,
-                text=value.node_names,
-                mode="markers",
-                marker=go.scatter.Marker(
-                    size=12,
-                    autocolorscale=False,
-                    color=value.node_weight,
-                    line=go.scatter.marker.Line(width=2, color="black"),
-                ),
+        for key, value in wh_class.items():
+            all_traces.append(
+                go.Scatter(
+                    name=key,
+                    x=value.node_x,
+                    y=value.node_y,
+                    text=value.node_names,
+                    mode="markers",
+                    marker=go.scatter.Marker(
+                        size=12,
+                        autocolorscale=False,
+                        color=value.node_weight,
+                        line=go.scatter.marker.Line(width=2, color="black"),
+                    ),
+                )
             )
-        )
 
     # Systems, color coded if weights given
     for key, value in color_coded_values.items():
@@ -199,10 +197,10 @@ def break_into_color_groups(color_groups: dict, graph_values: GraphValues):
         return {"Systems": graph_values}
 
     split_groups: Dict[str, GraphValues] = {}
-    color_to_names = {v: k for k, v in color_groups.items()}
+    color_to_names = {distinctipy.get_hex(v): k for k, v in color_groups.items()}
     for idx, weight in enumerate(graph_values.node_weight):
 
-        if weight not in color_groups.values():
+        if weight not in color_to_names.keys():
             individual_values = split_groups.setdefault("Other", GraphValues())
 
         else:
@@ -230,12 +228,23 @@ if __name__ == "__main__":
     all_data = AllData(skip_build=True)
 
     AnokisData = GetAnokisData()
-    # static_types = list(set([f"Class: {system.wh_class} - Static {system.statics}" for system in AnokisData]))
+    weather = list(set([system.weather for system in AnokisData if system.weather is not None]))
+    weather.append("None")
+    # WormholeClassFormatting.color_map = generate_distinct_colorings(keys=["C1", "C2", "C3", "C4", "C5", "C6", "C13", "Thera", "Drifter"], )
+    # WormholeWeatherFormatting.color_map = generate_distinct_colorings(keys=weather, existing=WormholeClassFormatting.color_map, pastel_factor=True)
     # WormholeStaticFormatting.color_map = generate_distinct_colorings(keys=static_types)
-    WormholeStaticFormatting.anokis_map = {system.name: system for system in AnokisData}
+    WormholeClassFormatting.anokis_map = {system.name: system for system in AnokisData}
+    WormholeStaticFormatting.anokis_map = WormholeClassFormatting.anokis_map
+    WormholeWeatherFormatting.anokis_map = WormholeClassFormatting.anokis_map
 
     QuickMap(
-        all_data, include_universe=[Universe.WORMHOLE], formatting=WormholeStaticFormatting, include_jump_names=False
+        all_data,
+        include_universe=[Universe.WORMHOLE],
+        formatting=WormholeWeatherFormatting,
+        second_formatting=WormholeClassFormatting,
+        include_jump_names=False,
     )
 
-    print(WormholeStaticFormatting.color_map)
+    print(WormholeClassFormatting.color_map)
+
+    print(WormholeWeatherFormatting.color_map)
