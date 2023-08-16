@@ -219,24 +219,21 @@ if __name__ == "__main__":
     all_data = AllData(skip_build=True)
 
     AnokisData = GetAnokisData()
-    weather = list(set([system.weather for system in AnokisData if system.weather is not None]))
-    weather.append("None")
-    static_types = {f"Class: {system.wh_class} - Static {system.statics}" for system in AnokisData}
-    # WormholeClassFormatting.color_map = generate_distinct_colorings(keys=["C1", "C2", "C3", "C4", "C5", "C6", "C13", "Thera", "Drifter"], )
+
     # WormholeWeatherFormatting.color_map = generate_distinct_colorings(keys=weather, existing=WormholeClassFormatting.color_map, pastel_factor=True)
-    WormholeStaticFormatting.color_map = generate_distinct_colorings(
-        keys=static_types, existing=WormholeClassFormatting.color_map, pastel_factor=True
-    )
+    # RegionFormatting.color_map = generate_distinct_colorings(
+    #     keys=[region.Name for region in all_data.Regions], existing=None, pastel_factor=True
+    # )
     WormholeClassFormatting.anokis_map = {system.name: system for system in AnokisData}
     WormholeStaticFormatting.anokis_map = WormholeClassFormatting.anokis_map
     WormholeWeatherFormatting.anokis_map = WormholeClassFormatting.anokis_map
 
     QuickMap(
         all_data,
-        include_universe=[Universe.WORMHOLE],
-        formatting=WormholeStaticFormatting,
-        second_formatting=WormholeClassFormatting,
+        include_universe=[Universe.EDEN],
+        formatting=RegionFormatting,
+        second_formatting=None,
         include_jump_names=False,
     )
 
-    print(WormholeStaticFormatting.color_map)
+    print(RegionFormatting.color_map)
