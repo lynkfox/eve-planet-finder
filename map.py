@@ -52,10 +52,14 @@ def QuickMap(
     formatting: iDisplayFormatting = DefaultFormatting,
     second_formatting: iDisplayFormatting = None,
     include_jump_names: bool = True,
+    three_dimension: bool = False,
 ):
     """
     see map.formatting.py for Formatting classes.  Second formatting will be "under" the standard formatting, useful for broader categories
     """
+
+    graph_obj = go.scatter if not three_dimension else go.scatter3d
+    scatter_obj = go.Scatter if not three_dimension else go.Scatter3d
 
     systemMap = nx.Graph()
     graph_values = GraphValues()
@@ -70,6 +74,7 @@ def QuickMap(
         systemMap.add_node(system.Name)
         graph_values.node_x.append(system.Position.X / X_POSITION_RELATIVE)
         graph_values.node_y.append(system.Position.Y / Y_POSITION_RELATIVE)
+        graph_values.node_z.append(system.Position.Z / Z_POSITION_RELATIVE)
         graph_values.node_names.append(formatting.node_naming(system))
         graph_values.node_weight.append(formatting.node_coloring(system))
         if second_formatting is not None:
@@ -94,6 +99,9 @@ def QuickMap(
                     graph_values.edge_y.append(system.Position.Y / Y_POSITION_RELATIVE)
                     graph_values.edge_y.append(destination.Position.Y / Y_POSITION_RELATIVE)
                     graph_values.edge_y.append(None)
+                    graph_values.edge_z.append(system.Position.Z / Z_POSITION_RELATIVE)
+                    graph_values.edge_z.append(destination.Position.Z / Z_POSITION_RELATIVE)
+                    graph_values.edge_z.append(None)
                     graph_values.edge_marker.append(build_edge_text_point(system, destination))
 
     color_coded_values = break_into_color_groups(formatting.color_map, graph_values)
@@ -102,36 +110,41 @@ def QuickMap(
 
     # System Connection Lines
 
-    all_traces.append(
-        go.Scatter(
-            name="Connections",
-            x=graph_values.edge_x,
-            y=graph_values.edge_y,
-            line=go.scatter.Line(width=0.5, color="#000"),
-            hoverinfo="none",
-            mode="lines",
-        )
+    connections = scatter_obj(
+        name="Connections",
+        x=graph_values.edge_x,
+        y=graph_values.edge_y,
+        line=graph_obj.Line(width=0.5, color="#000"),
+        hoverinfo="none",
+        mode="lines",
     )
+
+    if three_dimension:
+        connections.z = graph_values.edge_z
+
+    all_traces.append(connections)
 
     if include_jump_names:
 
-        all_traces.append(
-            go.Scatter(
-                name="Connection Info",
-                x=[node.x for node in graph_values.edge_marker],
-                y=[node.y for node in graph_values.edge_marker],
-                text=[node.text for node in graph_values.edge_marker],
-                hoverinfo="text",
-                mode="markers",
-                marker=go.scatter.Marker(
-                    symbol="diamond-tall",
-                    opacity=0.3,
-                    line=go.scatter.marker.Line(width=0.4, color="#777"),
-                    size=8,
-                    color="#A921E1",
-                ),
-            )
+        jump_names = scatter_obj(
+            name="Connection Info",
+            x=[node.x for node in graph_values.edge_marker],
+            y=[node.y for node in graph_values.edge_marker],
+            text=[node.text for node in graph_values.edge_marker],
+            hoverinfo="text",
+            mode="markers",
+            marker=graph_obj.Marker(
+                symbol="diamond-tall",
+                opacity=0.3,
+                line=graph_obj.marker.Line(width=0.4, color="#777"),
+                size=8,
+                color="#A921E1",
+            ),
         )
+        if three_dimension:
+            jump_names.z = [node.z for node in graph_values.edge_marker]
+
+        all_traces.append(jump_names)
 
     if second_formatting is not None:
         new_graph = deepcopy(graph_values)
@@ -140,31 +153,36 @@ def QuickMap(
         wh_class = break_into_color_groups(second_formatting.color_map, new_graph)
 
         for key, value in wh_class.items():
-            all_traces.append(
-                go.Scatter(
-                    name=key,
-                    x=value.node_x,
-                    y=value.node_y,
-                    text=value.node_names,
-                    mode="markers",
-                    opacity=0.5,
-                    marker=second_formatting.marker(value.node_weight),
-                )
-            )
 
-    # Systems, color coded if weights given
-    for key, value in color_coded_values.items():
-
-        all_traces.append(
-            go.Scatter(
+            under_layer = scatter_obj(
                 name=key,
                 x=value.node_x,
                 y=value.node_y,
                 text=value.node_names,
                 mode="markers",
-                marker=formatting.marker(value.node_weight),
+                opacity=0.5,
+                marker=second_formatting.marker(value.node_weight, three_dimension),
             )
+            if three_dimension:
+                under_layer.z = value.node_z
+
+            all_traces.append(under_layer)
+
+    # Systems, color coded if weights given
+    for key, value in color_coded_values.items():
+
+        upper_layer = scatter_obj(
+            name=key,
+            x=value.node_x,
+            y=value.node_y,
+            text=value.node_names,
+            legendrank=10,
+            mode="markers",
+            marker=formatting.marker(value.node_weight, three_dimension),
         )
+        if three_dimension:
+            upper_layer.z = value.node_z
+        all_traces.append(upper_layer)
 
     fig = go.Figure(
         data=all_traces,
@@ -191,7 +209,7 @@ def break_into_color_groups(color_groups: dict, graph_values: GraphValues):
     color_to_names = {distinctipy.get_hex(v): k for k, v in color_groups.items()}
     for idx, weight in enumerate(graph_values.node_weight):
 
-        if weight not in color_to_names.keys():
+        if weight not in color_to_names.keys() and weight not in color_groups.values():
             individual_values = split_groups.setdefault("Other", GraphValues())
 
         else:
@@ -230,10 +248,11 @@ if __name__ == "__main__":
 
     QuickMap(
         all_data,
-        include_universe=[Universe.EDEN],
-        formatting=RegionFormatting,
-        second_formatting=None,
+        include_universe=[Universe.WORMHOLE],
+        formatting=WormholeStaticFormatting,
+        second_formatting=WormholeClassFormatting,
         include_jump_names=False,
+        three_dimension=True,
     )
 
-    print(RegionFormatting.color_map)
+    # print(RegionFormatting.color_map)

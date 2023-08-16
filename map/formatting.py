@@ -61,13 +61,23 @@ class iDisplayFormatting:
     color_map = {}
 
     @classmethod
-    def marker(cls, weights: list, size: int = 10):
-        return go.scatter.Marker(
-            size=size,
-            autocolorscale=False,
-            color=weights,
-            line=go.scatter.marker.Line(width=2, color="black"),
-        )
+    def marker(cls, weights: list, three_dimension: bool, size: int = 10):
+
+        if three_dimension:
+            return go.scatter3d.Marker(
+                size=size,
+                autocolorscale=False,
+                color=weights,
+                line=go.scatter3d.marker.Line(width=2, color="black"),
+            )
+
+        else:
+            return go.scatter.Marker(
+                size=size,
+                autocolorscale=False,
+                color=weights,
+                line=go.scatter.marker.Line(width=2, color="black"),
+            )
 
     @classmethod
     def node_naming(cls, system: System):
@@ -218,6 +228,27 @@ class RegionFormatting(iDisplayFormatting):
     def node_coloring(cls, system: System):
 
         return cls._output_hex(cls.color_map.get(system.Region_Name, system.Region_Id))
+
+
+class SecurityFormatting(iDisplayFormatting):
+    color_map = {
+        "HighSec": distinctipy.get_hex("forestgreen"),
+        "LowSec": distinctipy.get_hex("darkorange"),
+        "Nullsec": distinctipy.get_hex("firebrick"),
+    }
+
+    @classmethod
+    def node_naming(cls, system: System):
+        return f"{system.Name}: {system.Security_Status}"
+
+    @classmethod
+    def node_coloring(cls, system: System):
+        if system.Security_Status >= 0.5:
+            return "forestgreen"
+        if system.Security_Status > 0:
+            return "darkorange"
+        if system.Security_Status <= 0:
+            return "firebrick"
 
 
 class WormholeClassFormatting(iDisplayFormatting):
@@ -413,14 +444,24 @@ class WormholeWeatherFormatting(iDisplayFormatting):
     anokis_map = {}
 
     @classmethod
-    def marker(cls, weights: list, size: int = 13):
-        return go.scatter.Marker(
-            size=size,
-            symbol="diamond-dot",
-            autocolorscale=False,
-            color=weights,
-            line=go.scatter.marker.Line(width=2, color="black"),
-        )
+    def marker(cls, weights: list, three_dimension: bool, size: int = 13):
+        if three_dimension:
+            return go.scatter3d.Marker(
+                size=size,
+                symbol="diamond-dot",
+                autocolorscale=False,
+                color=weights,
+                line=go.scatter3d.marker.Line(width=2, color="black"),
+            )
+        else:
+
+            return go.scatter.Marker(
+                size=size,
+                symbol="diamond-dot",
+                autocolorscale=False,
+                color=weights,
+                line=go.scatter.marker.Line(width=2, color="black"),
+            )
 
     @classmethod
     def node_naming(cls, system: System):
