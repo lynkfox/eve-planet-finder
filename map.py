@@ -199,7 +199,9 @@ if __name__ == "__main__":
     all_data = AllData(skip_build=True)
 
     AnokisData = GetAnokisData()
-    static_types = list(set([system.statics for system in AnokisData]))
+    # static_types = list(set([f"Class: {system.wh_class} - Static {system.statics}" for system in AnokisData]))
+    # WormholeStaticFormatting.color_map = generate_distinct_colorings(keys=static_types)
+    WormholeStaticFormatting.anokis_map = {system.name: system for system in AnokisData}
 
     QuickMap(
         all_data, include_universe=[Universe.WORMHOLE], formatting=WormholeStaticFormatting, include_jump_names=False
