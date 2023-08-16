@@ -199,6 +199,8 @@ def QuickMap(
 
     fig.show()
 
+    return fig
+
 
 def break_into_color_groups(color_groups: dict, graph_values: GraphValues):
 
@@ -246,13 +248,15 @@ if __name__ == "__main__":
     WormholeStaticFormatting.anokis_map = WormholeClassFormatting.anokis_map
     WormholeWeatherFormatting.anokis_map = WormholeClassFormatting.anokis_map
 
-    QuickMap(
+    figure = QuickMap(
         all_data,
         include_universe=[Universe.WORMHOLE],
-        formatting=WormholeStaticFormatting,
+        formatting=WormholeWeatherFormatting,
         second_formatting=WormholeClassFormatting,
         include_jump_names=False,
         three_dimension=True,
     )
+
+    figure.write_html("pre_rendered_maps/3D/wormhole_by_weather_and_class.html")
 
     # print(RegionFormatting.color_map)

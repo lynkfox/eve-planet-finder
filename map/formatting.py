@@ -447,8 +447,8 @@ class WormholeWeatherFormatting(iDisplayFormatting):
     def marker(cls, weights: list, three_dimension: bool, size: int = 13):
         if three_dimension:
             return go.scatter3d.Marker(
-                size=size,
-                symbol="diamond-dot",
+                size=size - 3,
+                symbol="diamond",
                 autocolorscale=False,
                 color=weights,
                 line=go.scatter3d.marker.Line(width=2, color="black"),
