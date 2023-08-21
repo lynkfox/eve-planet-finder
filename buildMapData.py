@@ -8,7 +8,7 @@ import yaml
 from alive_progress import alive_bar
 
 import models.map as mapData
-from data.planetaryResources import *
+from logic.planetaryResources import *
 from models.common import *
 
 data_files = {

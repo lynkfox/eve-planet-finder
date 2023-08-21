@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from distinctipy import distinctipy
 
 from buildMapData import *
-from data.get_anoikis_data import GetAnokisData
+from logic.get_anoikis_data import GetAnokisData
 from map.formatting import *
 from models.common import Universe
 from models.map import *
@@ -238,7 +238,7 @@ def break_into_color_groups(color_groups: dict, graph_values: GraphValues):
 if __name__ == "__main__":
     all_data = AllData(skip_build=True)
 
-    AnokisData = GetAnokisData()
+    AnokisData = GetAnokisData(pickle_data=False)
 
     # WormholeWeatherFormatting.color_map = generate_distinct_colorings(keys=weather, existing=WormholeClassFormatting.color_map, pastel_factor=True)
     # RegionFormatting.color_map = generate_distinct_colorings(
@@ -257,6 +257,6 @@ if __name__ == "__main__":
         three_dimension=True,
     )
 
-    figure.write_html("pre_rendered_maps/3D/wormhole_by_weather_and_class.html")
+    # figure.write_html("docs/pre_rendered_maps/3D/wormhole_by_weather_and_class.html")
 
     # print(RegionFormatting.color_map)

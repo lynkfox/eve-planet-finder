@@ -5,8 +5,8 @@ from dataclasses import dataclass, field, InitVar
 from functools import cached_property
 from typing import Any, Dict, List
 
-from data.planetaryResources import *
-from data.planetaryResources import RAW_RESOURCE_TO_TYPE
+from logic.planetaryResources import *
+from logic.planetaryResources import RAW_RESOURCE_TO_TYPE
 from models.common import Position, Universe
 
 MISSING = "ThisValueIsMissing"
