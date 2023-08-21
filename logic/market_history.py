@@ -67,7 +67,7 @@ def compare_snapshots(existing_orders: DataFrame, latest_orders: DataFrame, time
     for order in existing_orders.loc[existing_orders["checked"] is True].iterrows():
         order_updates.append(OrderHistoryEntry_Factory(order, None, timestamp))
 
-    new_orders_data = DataFrame(new_orders, columns=OrderHistoryEntry.__annotations__.values(), index="order_id")
+    new_orders_data = DataFrame(new_orders, columns=MarketOrder.__annotations__.values(), index="order_id")
     updates_data = DataFrame(order_updates, columns=OrderHistoryEntry.__annotations__.values(), index="order_id")
 
     return new_orders_data, updates_data
