@@ -11,6 +11,7 @@ import pandas
 import requests
 from dateutil.tz import tzutc
 
+from logic.database import SqlClientFactory
 from logic.market_history import compare_snapshots
 from models.market.orders import *
 
@@ -60,6 +61,7 @@ def get_market_history(file_name):
 
 
 def get_historical_fuzzworks(starting=None):
+    sql_conn = SqlClientFactory()
     if not starting:
         latest = json.loads(requests.get("https://market.fuzzwork.co.uk/api/orderset").content)["orderset"]
 
@@ -73,7 +75,7 @@ def get_historical_fuzzworks(starting=None):
     # ninety_days = sixty_days-1440
 
     snapshot = thirty_days
-    existing_history = None
+    existing_history = pandas.read_sql("SELECT * from active_orders", con=sql_conn)
     history_timestamp = None
     print(f"First snapshot to pull: {snapshot}")
     while snapshot < latest:
@@ -83,13 +85,15 @@ def get_historical_fuzzworks(starting=None):
         if existing_history is not None:
             print(f"Comparing {snapshot}[new] to {snapshot-1}[previous]")
             history_timestamp = determine_fuzzworks_timestamp(snapshot, latest, history_timestamp)
-            new_orders, updates = compare_snapshots(existing_history, new_history, history_timestamp)
+            new_orders, updates = compare_snapshots(existing_history, new_history, snapshot, history_timestamp)
 
-            new_orders.to_sql()
-            updates.to_sql()
+            new_orders.to_sql(con=sql_conn, name="active_orders", if_exists="append")
+            updates.to_sql(con=sql_conn, name="order_history", if_exists="append")
+
+            break
 
         else:
-            new_history.to_sql()
+            new_history.to_sql("active_orders", sql_conn, if_exists="append")
 
         existing_history = new_history.copy(deep=True)
         snapshot += 1

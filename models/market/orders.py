@@ -8,7 +8,7 @@ from pandas import DataFrame
 from pydantic.dataclasses import dataclass as pydanticDataclass
 
 
-@pydanticDataclass
+@pydanticDataclass(unsafe_hash=True)
 class MarketOrder:
     """
     A Singular order at a given point in time. May already exist in storage. If the data pulled is newer
@@ -30,19 +30,34 @@ class MarketOrder:
     system_id: int = field(init=True)
 
 
-@dataclass
+@pydanticDataclass(unsafe_hash=True)
 class OrderHistoryEntry:
     """
     A Record of changes to a given order. Every time an order is retrieved, if it is different from the known value
     then an OrderHistory Entry should be created to track what is different.
     """
 
+    order_id: int = field(init=False, default=0)
     original_order: MarketOrder = field(init=True)
     date_changed: datetime = field(init=True)
-    volume_change: Optional[int] = field(kw_only=True, default=None)
+    volume_change: Optional[int] = field(kw_only=True, default=0)
     expired: Optional[bool] = field(kw_only=True, default=None)
     new_order: Optional[bool] = field(kw_only=True, default=None)
     price_change: Optional[int] = field(kw_only=True, default=None)
+
+    def __post_init__(self):
+        self.order_id = self.original_order.order_id
+
+    def as_dict(self):
+        return {
+            "order_id": self.order_id,
+            "original_order": self.original_order,
+            "date_changed": self.date_changed,
+            "volume_change": self.volume_change,
+            "expired": self.expired,
+            "new_order": self.new_order,
+            "price_change": self.price_change,
+        }
 
 
 @dataclass

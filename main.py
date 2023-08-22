@@ -7,7 +7,7 @@ from models.common import WeightMethod
 
 if __name__ == "__main__":
 
-    get_historical_fuzzworks()
+    get_historical_fuzzworks(starting=122331)
     # result = get_market_history(122298)
     # derived_data = CalculatedMapData()
     print("wee")
