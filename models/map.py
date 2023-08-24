@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, InitVar
 from functools import cached_property
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from logic.planetaryResources import *
 from logic.planetaryResources import RAW_RESOURCE_TO_TYPE
 from models.common import Position, Universe
+from models.third_party.dotlan import *
 
 MISSING = "ThisValueIsMissing"
 
@@ -34,7 +35,7 @@ class iStaticDataExport:
         return hash(self.Name, self.Id)
 
     def __eq__(self, __o):
-        if isinstance(__o, Commodity):
+        if isinstance(__o, type(self)):
             return self.Name == __o.Name and self.Id == __o.Id
         return False
 
@@ -217,6 +218,8 @@ class Stargate(iStaticDataExport):
     DestinationSystem_Id: int = field(kw_only=True, default=0)
     DestinationName: str = field(kw_only=True, default="")
     OriginSystem_Id: int = field(kw_only=True, default=0)
+    DotlanOrigin: Optional[DotlanConnectionEndpoint] = field(kw_only=True, default=None)
+    DotlanDestination: Optional[DotlanConnectionEndpoint] = field(kw_only=True, default=None)
 
     def __post_init__(self, properties: Dict[str, Any]):
         if properties is not None:
@@ -261,10 +264,26 @@ class Stargate(iStaticDataExport):
         return origin
 
     def __getstate__(self):
-        return (self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name)
+        return (
+            self.Name,
+            self.Id,
+            self.DestinationSystem_Id,
+            self.OriginSystem_Id,
+            self.DestinationSystem_Name,
+            self.DotlanOrigin,
+            self.DotlanDestination,
+        )
 
     def __setstate__(self, state):
-        self.Name, self.Id, self.DestinationSystem_Id, self.OriginSystem_Id, self.DestinationSystem_Name = state
+        (
+            self.Name,
+            self.Id,
+            self.DestinationSystem_Id,
+            self.OriginSystem_Id,
+            self.DestinationSystem_Name,
+            self.DotlanOrigin,
+            self.DotlanDestination,
+        ) = state
 
 
 @dataclass
@@ -275,6 +294,7 @@ class System(iStaticDataExport):
     Stargate_Ids: List[int] = field(kw_only=True, default_factory=list)
     Constellation_Id: int = field(kw_only=True, default=0)
     Region_Id: int = field(kw_only=True, default=0)
+    Dotlan: Optional[DotlanSystem] = field(kw_only=True, default=None)
 
     def __post_init__(self, properties: Dict[str, Any]):
         if properties is not None:
@@ -311,6 +331,9 @@ class System(iStaticDataExport):
 
             elif re.match(r"V-\d{3}", self.Name) is not None:
                 self.Position.Universe = Universe.V_SYS
+
+            elif self.GetRegion() == "Pochven":
+                self.Position.Universe = Universe.TRIG
 
         # if re.match(r"AD\d{3}$", self.Name) is None and re.match(r"V-(\d{3})$", self.Name) is None:
         self.client.ALL_SYSTEMS.append(self)
@@ -415,6 +438,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
+            self.Dotlan,
         )
 
     def __setstate__(self, state):
@@ -426,6 +450,7 @@ class System(iStaticDataExport):
             self.Security_Status,
             self.Position,
             self.Constellation_Id,
+            self.Dotlan,
         ) = state
 
 

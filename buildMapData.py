@@ -7,9 +7,12 @@ from typing import Any, Union
 import yaml
 from alive_progress import alive_bar
 
+import logic.get_dotlan_maps as dotlan
 import models.map as mapData
+from logic.common import try_parse
 from logic.planetaryResources import *
 from models.common import *
+from models.third_party.dotlan import *
 
 data_files = {
     "data/regions.en-us.yaml": mapData.Region,
@@ -37,7 +40,9 @@ def CreateMaps(data, obj, client) -> dict:
 
 
 class AllData:
-    def __init__(self, skip_build: bool = False) -> None:
+    def __init__(self, skip_build: bool = False, skip_dotlan_rebuild: bool = None) -> None:
+        if skip_dotlan_rebuild is None:
+            skip_dotlan_rebuild = skip_build
         self.MapClient = mapData.MapClient()
         self.PickleAttributes = [
             "Commodities",
@@ -54,6 +59,12 @@ class AllData:
             BuildMapData(self.MapClient)
 
         self.SetAllData()
+        self.add_dotlan(skip_dotlan_rebuild)
+
+    def add_dotlan(self, skip_build: bool):
+
+        with alive_bar(len(dotlan.REGION_NAMES), title_length=40) as bar:
+            dotlan.get_all_dotlan_data(self, build_data=not skip_build, progress_bar=bar)
 
     def SetAllData(self):
         self.Commodities = self.MapClient.ALL_COMMODITIES
@@ -65,46 +76,26 @@ class AllData:
         self.Regions = self.MapClient.ALL_REGIONS
 
     def GetCommodity(self, value: Union[str, int]) -> mapData.Commodity:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Commodities if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Commodities if commodity.Id == value)
+        return next(item for item in self.Commodities if item.Name == value or item.Id == try_parse(int, value))
 
     def GetPlanetType(self, value: Union[str, int]) -> mapData.PlanetType:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.PlanetTypes if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.PlanetTypes if commodity.Id == value)
+        return next(item for item in self.PlanetTypes if item.Name == value or item.Id == try_parse(int, value))
 
     def GetPlanet(self, value: Union[str, int]) -> mapData.Planet:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Planets if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Planets if commodity.Id == value)
+        return next(item for item in self.Planets if item.Name == value or item.Id == try_parse(int, value))
 
     def GetStargate(self, value: Union[str, int]) -> mapData.Stargate:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Stargates if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Stargates if commodity.Id == value)
+        return next(item for item in self.Stargates if item.Name == value or item.Id == try_parse(int, value))
 
     def GetSystem(self, value: Union[str, int]) -> mapData.System:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Systems if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Systems if commodity.Id == value)
+
+        return next(item for item in self.Systems if item.Name == value or item.Id == try_parse(int, value))
 
     def GetConstellation(self, value: Union[str, int]) -> mapData.Constellation:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Constellations if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Constellations if commodity.Id == value)
+        return next(item for item in self.Constellations if item.Name == value or item.Id == try_parse(int, value))
 
     def GetRegion(self, value: Union[str, int]) -> mapData.Region:
-        if isinstance(value, str):
-            return next(commodity for commodity in self.Regions if commodity.Name == value)
-        if isinstance(value, int):
-            return next(commodity for commodity in self.Regions if commodity.Id == value)
+        return next(item for item in self.Regions if item.Name == value or item.Id == try_parse(int, value))
 
     @cached_property
     def TotalEdenSystems(self) -> int:
@@ -133,9 +124,12 @@ class AllData:
         print("Map Data Loaded")
 
 
-def BuildMapData(client: mapData.MapClient):
+def BuildMapData(client: mapData.MapClient, include_pi_data: bool = False):
 
-    with alive_bar(title_length=40) as bar:
+    tasks = len(data_files)
+    tasks += len(RawResources)
+
+    with alive_bar(tasks, title_length=40) as bar:
         for key, value in data_files.items():
             bar.title(f"Processing {key}")
             yamlFile = LoadYaml(key)
@@ -144,9 +138,13 @@ def BuildMapData(client: mapData.MapClient):
             bar()
 
         for value in RawResources:
+            bar.title(f"PI Calculations {value['nameID']['en']}")
             mapData.Commodity(properties=value, client=client)
+
+            bar()
 
 
 if __name__ == "__main__":
     data = AllData()
+    # add_dotlan(data)
     data.PickleAll()

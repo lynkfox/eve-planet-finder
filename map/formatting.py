@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import List
 
 import distinctipy
 import networkx as nx
@@ -43,6 +44,7 @@ class GraphValues:
         self.node_custom_data = []
         self.node_weight = []
         self.node_text = []
+        self.connections: List[Connection] = []
         self.edge_x = []
         self.edge_y = []
         self.edge_z = []
@@ -57,8 +59,21 @@ class EdgeText:
     text: str
 
 
+@dataclass
+class Connection:
+    origin_x: float
+    origin_y: float
+    origin_z: float
+    destination_x: float
+    destination_y: float
+    destination_z: float
+    origin_sys: System
+    destination_sys: System
+
+
 class iDisplayFormatting:
     color_map = {}
+    opacity = 1
 
     @classmethod
     def marker(cls, weights: list, three_dimension: bool, size: int = 10):
@@ -93,6 +108,10 @@ class iDisplayFormatting:
             return distinctipy.get_hex(color)
         else:
             return color
+
+    @classmethod
+    def connection_grouping(cls, graphvalues):
+        return None
 
 
 class DefaultFormatting(iDisplayFormatting):
@@ -228,6 +247,10 @@ class RegionFormatting(iDisplayFormatting):
     def node_coloring(cls, system: System):
 
         return cls._output_hex(cls.color_map.get(system.Region_Name, system.Region_Id))
+
+    @classmethod
+    def connection_grouping(cls, system: System):
+        return system.GetRegion().Name
 
 
 class SecurityFormatting(iDisplayFormatting):
