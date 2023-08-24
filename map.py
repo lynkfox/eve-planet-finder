@@ -72,81 +72,110 @@ def QuickMap(
     special_names = []
     special_weights = []
 
-    for system in all_data.Systems:
-        if system.Position.Universe not in include_universe:
-            continue
+    systems_to_process = [sys for sys in all_data.Systems if sys.Position.Universe in include_universe]
 
-        if system.Dotlan is None and dotlan_layout:
-            print(f"Warning: Dotlan Postion data missing for: {system.Name} in {system.Region_Name}")
-            continue
+    # systems to process + groups to build + build the graph itself
+    cycles = len(systems_to_process) + 1 + 1
+    # if secondary groups
+    cycles += 1 if second_formatting is not None else 0
+    # connection groups to form if Eden is included
+    cycles += 1 if Universe.EDEN in include_universe else 0
 
-        system_position = system.Dotlan.Position if dotlan_layout else system.Position
+    with alive_bar(total=cycles, title_length=40, bar="radioactive") as bar:
+        for system in systems_to_process:
 
-        systemMap.add_node(system.Name)
-        graph_values.node_x.append(system_position.X / X_POSITION_RELATIVE)
-        graph_values.node_y.append(system_position.Y / Y_POSITION_RELATIVE)
-        graph_values.node_z.append(system_position.Z / Z_POSITION_RELATIVE)
-        graph_values.node_names.append(formatting.node_naming(system))
-        graph_values.node_weight.append(formatting.node_coloring(system))
-        if second_formatting is not None:
-            special_names.append(second_formatting.node_naming(system))
-            special_weights.append(second_formatting.node_coloring(system))
+            bar.title(f"Building {system.Name} Node")
+            if system.Dotlan is None and dotlan_layout:
+                print(f"Warning: Dotlan Postion data missing for: {system.Name} in {system.Region_Name}")
+                continue
 
-        if system.Position.Universe == Universe.EDEN:
-            system.GetLinkedSystems()
+            system_position = system.Dotlan.Position if dotlan_layout else system.Position
 
-            for destination in system.GetLinkedSystems():
-                destination_position = destination.Dotlan.Position if dotlan_layout else destination.Position
+            systemMap.add_node(system.Name)
+            graph_values.node_x.append(system_position.X / X_POSITION_RELATIVE)
+            graph_values.node_y.append(system_position.Y / Y_POSITION_RELATIVE)
+            graph_values.node_z.append(system_position.Z / Z_POSITION_RELATIVE)
+            graph_values.node_names.append(formatting.node_naming(system))
+            graph_values.node_weight.append(formatting.node_coloring(system))
+            if second_formatting is not None:
+                special_names.append(second_formatting.node_naming(system))
+                special_weights.append(second_formatting.node_coloring(system))
 
-                line = (destination.Name, system.Name)
-                opposite = (system.Name, destination.Name)
-                if line in existing_lines or opposite in existing_lines:
-                    continue
-                else:
-                    existing_lines.append(line)
-                    systemMap.add_edge(system.Name, destination.Name)
-                    graph_values.connections.append(
-                        Connection(
-                            origin_x=system_position.X / X_POSITION_RELATIVE,
-                            origin_y=system_position.Y / Y_POSITION_RELATIVE,
-                            origin_z=system_position.Z / Z_POSITION_RELATIVE,
-                            destination_x=destination_position.X / X_POSITION_RELATIVE,
-                            destination_y=destination_position.Y / Y_POSITION_RELATIVE,
-                            destination_z=destination_position.Z / Z_POSITION_RELATIVE,
-                            origin_sys=system,
-                            destination_sys=destination,
+            if system.Position.Universe == Universe.EDEN:
+                bar.title(f"Building {system.Name} Connections")
+                system.GetLinkedSystems()
+
+                for destination in system.GetLinkedSystems():
+                    destination_position = destination.Dotlan.Position if dotlan_layout else destination.Position
+
+                    line = (destination.Name, system.Name)
+                    opposite = (system.Name, destination.Name)
+                    if line in existing_lines or opposite in existing_lines:
+                        continue
+                    else:
+                        existing_lines.append(line)
+                        systemMap.add_edge(system.Name, destination.Name)
+                        graph_values.connections.append(
+                            Connection(
+                                origin_x=system_position.X / X_POSITION_RELATIVE,
+                                origin_y=system_position.Y / Y_POSITION_RELATIVE,
+                                origin_z=system_position.Z / Z_POSITION_RELATIVE,
+                                destination_x=destination_position.X / X_POSITION_RELATIVE,
+                                destination_y=destination_position.Y / Y_POSITION_RELATIVE,
+                                destination_z=destination_position.Z / Z_POSITION_RELATIVE,
+                                origin_sys=system,
+                                destination_sys=destination,
+                            )
                         )
-                    )
 
-    all_traces = break_connections_into_color_groups(
-        formatting.connection_grouping, scatter_obj, graph_obj, formatting.color_map, graph_values, three_dimension
-    )
+            bar()
 
-    # System Connection Lines
+        all_traces = []
+        # System Connection Lines
+        if Universe.EDEN in include_universe:
+            bar.title("Create Connection Traces")
+            all_traces.extend(
+                break_connections_into_color_groups(
+                    formatting.connection_grouping,
+                    scatter_obj,
+                    graph_obj,
+                    formatting.color_map,
+                    graph_values,
+                    three_dimension,
+                )
+            )
 
-    if second_formatting is not None:
-        new_graph = deepcopy(graph_values)
-        new_graph.node_names = special_names
-        new_graph.node_weight = special_weights
-        all_traces.extend(break_into_color_groups(second_formatting, scatter_obj, new_graph, three_dimension))
+            bar()
 
-    # Systems, color coded if weights given
-    all_traces.extend(
-        break_into_color_groups(formatting, scatter_obj, graph_values, three_dimension, legend_order=legend_order)
-    )
+        if second_formatting is not None:
+            bar.title(f"Coloring each {second_formatting.Name}")
+            new_graph = deepcopy(graph_values)
+            new_graph.node_names = special_names
+            new_graph.node_weight = special_weights
+            all_traces.extend(break_into_color_groups(second_formatting, scatter_obj, new_graph, three_dimension))
+            bar()
 
-    fig = go.Figure(
-        data=all_traces,
-        layout=go.Layout(
-            title=f"Eve Online System Map for: {', '.join([uni.name for uni in include_universe])}",
-            titlefont_size=16,
-            showlegend=True,
-            hovermode="closest",
-            margin=go.layout.Margin(b=20, l=5, r=5, t=40),
-            xaxis=go.layout.XAxis(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=go.layout.YAxis(showgrid=False, zeroline=False, showticklabels=False),
-        ),
-    )
+        # Systems, color coded if weights given
+        bar.title(f"Coloring each {formatting.Name}")
+        all_traces.extend(
+            break_into_color_groups(formatting, scatter_obj, graph_values, three_dimension, legend_order=legend_order)
+        )
+        bar()
+
+        bar.title(f"Finalizing Map")
+        fig = go.Figure(
+            data=all_traces,
+            layout=go.Layout(
+                title=f"Eve Online System Map for: {', '.join([uni.name for uni in include_universe])}",
+                titlefont_size=16,
+                showlegend=True,
+                hovermode="closest",
+                margin=go.layout.Margin(b=20, l=5, r=5, t=40),
+                xaxis=go.layout.XAxis(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=go.layout.YAxis(showgrid=False, zeroline=False, showticklabels=False),
+            ),
+        )
+        bar()
 
     fig.show()
 

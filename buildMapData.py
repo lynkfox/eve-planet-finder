@@ -9,7 +9,7 @@ from alive_progress import alive_bar
 
 import logic.get_dotlan_maps as dotlan
 import models.map as mapData
-from logic.common import try_parse
+from logic.common import ProgressBar, try_parse
 from logic.planetaryResources import *
 from models.common import *
 from models.third_party.dotlan import *
@@ -40,9 +40,14 @@ def CreateMaps(data, obj, client) -> dict:
 
 
 class AllData:
-    def __init__(self, skip_build: bool = False, skip_dotlan_rebuild: bool = None) -> None:
+    def __init__(
+        self, skip_build: bool = False, skip_dotlan_rebuild: bool = None, skip_dotlan_scrape: bool = None
+    ) -> None:
         if skip_dotlan_rebuild is None:
             skip_dotlan_rebuild = skip_build
+
+        if skip_dotlan_scrape is None:
+            skip_dotlan_scrape = skip_build
         self.MapClient = mapData.MapClient()
         self.PickleAttributes = [
             "Commodities",
@@ -59,12 +64,14 @@ class AllData:
             BuildMapData(self.MapClient)
 
         self.SetAllData()
-        self.add_dotlan(skip_dotlan_rebuild)
+        self.add_dotlan(skip_dotlan_rebuild, skip_dotlan_scrape)
 
-    def add_dotlan(self, skip_build: bool):
+    def add_dotlan(self, skip_build: bool, skip_scrape: bool):
 
         with alive_bar(len(dotlan.REGION_NAMES), title_length=40) as bar:
-            dotlan.get_all_dotlan_data(self, build_data=not skip_build, progress_bar=bar)
+            dotlan.get_all_dotlan_data(
+                self, build_data=not skip_build, progress_bar=ProgressBar(bar=bar), force_dotlan_scrape=not skip_scrape
+            )
 
     def SetAllData(self):
         self.Commodities = self.MapClient.ALL_COMMODITIES

@@ -74,6 +74,7 @@ class Connection:
 class iDisplayFormatting:
     color_map = {}
     opacity = 1
+    Name = "Default"
 
     @classmethod
     def marker(cls, weights: list, three_dimension: bool, size: int = 10):
@@ -125,6 +126,7 @@ class DefaultFormatting(iDisplayFormatting):
 
 
 class RegionFormatting(iDisplayFormatting):
+    Name = "Region"
     color_map = {
         "Derelik": (0.48367180992680553, 0.4228967402056644, 0.631376260468515),
         "The Forge": (0.44309497948771154, 0.9785364214921539, 0.4270652916504713),
@@ -254,6 +256,7 @@ class RegionFormatting(iDisplayFormatting):
 
 
 class SecurityFormatting(iDisplayFormatting):
+    Name = "Security"
     color_map = {
         "HighSec": distinctipy.get_hex("forestgreen"),
         "LowSec": distinctipy.get_hex("darkorange"),
@@ -275,6 +278,7 @@ class SecurityFormatting(iDisplayFormatting):
 
 
 class WormholeClassFormatting(iDisplayFormatting):
+    Name = "WH Class"
     color_map = {
         "C1": (0.01410150138348698, 0.9938560702764367, 0.15529185179496618),
         "C2": (1.0, 0.0, 1.0),
@@ -314,6 +318,7 @@ class WormholeClassFormatting(iDisplayFormatting):
 
 
 class WormholeStaticFormatting(iDisplayFormatting):
+    Name = "WH Statics"
     color_map = {
         "Class: (c3) - Static ls/ns": (0.9857089871374185, 0.9955241587011132, 0.8530747827446243),
         "Class: (c2) - Static c4/hs/ns": (0.531516870774841, 0.6899402430638255, 0.41763575492859867),
@@ -442,6 +447,7 @@ class WormholeStaticFormatting(iDisplayFormatting):
 
 
 class WormholeWeatherFormatting(iDisplayFormatting):
+    Name = "WH Weather"
     color_map = {
         "Magnetar": (0.9910620813933451, 0.9515538007257447, 0.6644358723871735),
         "RedGiant": (0.9994202129467333, 0.5037269966838168, 0.5203155517901414),

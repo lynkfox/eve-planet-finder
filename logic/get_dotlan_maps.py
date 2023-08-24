@@ -1,11 +1,14 @@
 import os
 from io import BytesIO
 from pickle import dump, load
+from time import sleep
 from typing import Dict, Tuple
 
 import requests
 from bs4 import BeautifulSoup, ResultSet
 
+from logic.common import ProgressBar
+from logic.parse_dotlan_system_data import *
 from models.common import Position, Universe
 from models.third_party.dotlan import *
 
@@ -14,93 +17,99 @@ REGION_Y_OFFSET = 1000
 BASE_URL = "https://evemaps.dotlan.net/svg/"
 
 REGION_NAMES = [
-    "Aridia.svg",
-    "Black_Rise.svg",
-    "The_Bleak_Lands.svg",
-    "Branch.svg",
-    "Cache.svg",
-    "Catch.svg",
-    "The_Citadel.svg",
-    "Cloud_Ring.svg",
-    "Cobalt_Edge.svg",
-    "Curse.svg",
-    "Deklein.svg",
-    "Delve.svg",
-    "Derelik.svg",
-    "Detorid.svg",
-    "Devoid.svg",
-    "Domain.svg",
-    "Esoteria.svg",
-    "Essence.svg",
-    "Etherium_Reach.svg",
-    "Everyshore.svg",
-    "Fade.svg",
-    "Feythabolis.svg",
-    "The_Forge.svg",
-    "Fountain.svg",
-    "Geminate.svg",
-    "Genesis.svg",
-    "Great_Wildlands.svg",
-    "Heimatar.svg",
-    "Immensea.svg",
-    "Impass.svg",
-    "Insmother.svg",
-    "Kador.svg",
-    "The_Kalevala_Expanse.svg",
-    "Khanid.svg",
-    "Kor-Azor.svg",
-    "Lonetrek.svg",
-    "Malpais.svg",
-    "Metropolis.svg",
-    "Molden_Heath.svg",
-    "Oasa.svg",
-    "Omist.svg",
-    "Outer_Passage.svg",
-    "Outer_Ring.svg",
-    "Paragon_Soul.svg",
-    "Period_Basis.svg",
-    "Perrigen_Falls.svg",
-    "Placid.svg",
-    "Providence.svg",
-    "Pure_Blind.svg",
-    "Querious.svg",
-    "Scalding_Pass.svg",
-    "Sinq_Laison.svg",
-    "Solitude.svg",
-    "The_Spire.svg",
-    "Stain.svg",
-    "Syndicate.svg",
-    "Tash-Murkon.svg",
-    "Tenal.svg",
-    "Tenerifis.svg",
-    "Tribute.svg",
-    "Vale_of_the_Silent.svg",
-    "Venal.svg",
-    "Verge_Vendor.svg",
-    "Wicked_Creek.svg",
-    "Pochven.svg",
-    "UUA-F4.svg",
-    "J7HZ-F.svg",
-    "A821-A.svg",
+    "Aridia",
+    "Black_Rise",
+    "The_Bleak_Lands",
+    "Branch",
+    "Cache",
+    "Catch",
+    "The_Citadel",
+    "Cloud_Ring",
+    "Cobalt_Edge",
+    "Curse",
+    "Deklein",
+    "Delve",
+    "Derelik",
+    "Detorid",
+    "Devoid",
+    "Domain",
+    "Esoteria",
+    "Essence",
+    "Etherium_Reach",
+    "Everyshore",
+    "Fade",
+    "Feythabolis",
+    "The_Forge",
+    "Fountain",
+    "Geminate",
+    "Genesis",
+    "Great_Wildlands",
+    "Heimatar",
+    "Immensea",
+    "Impass",
+    "Insmother",
+    "Kador",
+    "The_Kalevala_Expanse",
+    "Khanid",
+    "Kor-Azor",
+    "Lonetrek",
+    "Malpais",
+    "Metropolis",
+    "Molden_Heath",
+    "Oasa",
+    "Omist",
+    "Outer_Passage",
+    "Outer_Ring",
+    "Paragon_Soul",
+    "Period_Basis",
+    "Perrigen_Falls",
+    "Placid",
+    "Providence",
+    "Pure_Blind",
+    "Querious",
+    "Scalding_Pass",
+    "Sinq_Laison",
+    "Solitude",
+    "The_Spire",
+    "Stain",
+    "Syndicate",
+    "Tash-Murkon",
+    "Tenal",
+    "Tenerifis",
+    "Tribute",
+    "Vale_of_the_Silent",
+    "Venal",
+    "Verge_Vendor",
+    "Wicked_Creek",
+    "Pochven",
+    "UUA-F4",
+    "J7HZ-F",
+    "A821-A",
 ]
 
 
-def get_map(name: str):
-    map_url = f"{BASE_URL}{name}"
+def get_map(name: str, backoff: int = 5, count=1):
+    map_url = f"{BASE_URL}{name}.svg"
     response = requests.get(map_url)
+    if response.status_code == 200:
+        return BytesIO(response.content)
 
-    return BytesIO(response.content)
+    else:
+        if count > 5:
+            raise Exception(f"Cannot get {name} map")
+        sleep(backoff)
+        get_map(name, backoff=backoff * 2, count=count + 1)
 
 
 def get_region_map():
-    return get_map("New_Eden.svg")
+    return get_map("New_Eden")
 
 
 def build_region_central_coordinates():
-    xml_root = BeautifulSoup(get_map("New_Eden.svg"), features="xml")
+    xml_root = BeautifulSoup(get_map("New_Eden"), features="xml")
 
     return {
-        region.name: region
+        region.Name: region
         for region in [parse_system(None, xml_root, node, "", is_region_map=True) for node in xml_root.findAll("use")]
         if region is not None
     }
@@ -128,20 +137,23 @@ def find_map_center(xml_root: BeautifulSoup):
 
 
 def parse_map(
-    map_svg: BytesIO, all_data_client: "AllData", region_name: str, region_data: Dict[str, DotlanSystem]
+    map_svg: BytesIO,
+    all_data_client: "AllData",
+    region_name: str,
+    region_data: Dict[str, DotlanSystem],
+    force_active_dotlan_scrape: bool,
 ) -> dict:
     """
     parse the xml representation of a dotlan map svg to pull out coordinate data for each system
     """
     xml_root = BeautifulSoup(map_svg, features="xml")
-    region_name = region_name.replace(".svg", "")
     center_x, center_y = find_map_center(xml_root)
     region_x, region_y = determine_region_relative_position(region_name, region_data)
 
     region_offset = DotlanRegionOffset(center_x, center_y, region_x, region_y)
 
     systems = {
-        system.sys_id: system
+        system.System_Id: system
         for system in [
             parse_system(all_data_client, xml_root, node, region_name, region_offset=region_offset)
             for node in xml_root.findAll("use")
@@ -154,6 +166,30 @@ def parse_map(
     }
 
     return {"systems": systems, "connections": connections}
+
+
+def load_dotlan_extra_data(region_name, force_active_dotlan_scrape, systems, progress_bar: ProgressBar):
+    cache = {}
+    region_extra_pickle = f"data/pickled_{region_name}_dotlan_extra"
+    base_update_string = f"D-Scrape[{region_name}]"
+    pickle_exists = os.path.exists(region_extra_pickle)
+    if not force_active_dotlan_scrape:
+        if pickle_exists:
+            progress_bar.Update(f"{base_update_string}: Load Pickle")
+            with open(region_extra_pickle, "rb") as pickleFile:
+                cache = load(pickleFile)
+
+    for system in systems.values():
+        progress_bar.Update(f"{base_update_string}: {system.Name}")
+        if system.System_Id not in cache.keys():
+            cache[system.System_Id] = parse_extra_dotlan_data(system.Name, system.System_Id)
+
+        system.More = cache[system.System_Id]
+
+    if not pickle_exists or force_active_dotlan_scrape:
+        progress_bar.Update(f"{base_update_string}: Pickling")
+        with open(region_extra_pickle, "wb") as pickleFile:
+            dump(cache, pickleFile)
 
 
 def parse_connections(node: ResultSet, region_offset: DotlanRegionOffset) -> DotlanConnection:
@@ -195,15 +231,27 @@ def parse_system(
         region = data_node.find("text", **{"class": "er"})
 
     ice = data_node.find("text", id=f"ice{sys_id}")
+    refining = data_node.find("polygon", **{"class": "v1"})
+    cloning = data_node.find("polygon", **{"class": "v2"})
+    industry = data_node.find("polygon", **{"class": "v3"})
+    research = data_node.find("polygon", **{"class": "v4"})
+    alliance = data_node.find("text", **{"class": "st"})
+    link = data_node.find("a").get("xlink:href", "")
 
     x, y = offset_around_region(node, region_offset)
 
     if is_region_map or (region is None or region.text == expected_region):
         return DotlanSystem(
-            sys_id=sys_id,
-            name=region.text if is_region_map else all_data_client.GetSystem(sys_id).Name,
+            System_Id=sys_id,
+            Name=region.text if is_region_map else all_data_client.GetSystem(sys_id).Name,
             Position=Position(X=x, Y=y, Z=0, Universe=Universe.EDEN),
+            faction=alliance.text if alliance is not None else "",
             has_ice=ice is not None,
+            has_refinery=refining is not None,
+            has_cloning=cloning is not None,
+            has_industry=industry is not None,
+            has_research=research is not None,
+            dotlan_link=link,
         )
 
     return None
@@ -256,36 +304,45 @@ def attach_dotlan_data(client: "AllData", region_data: dict):
         destination_stargate.DotlanDestination = connection.origin
 
 
-def get_all_dotlan_data(client: "AllData", build_data=True, progress_bar=None):
+def get_all_dotlan_data(
+    client: "AllData", build_data=True, progress_bar: ProgressBar = None, force_dotlan_scrape: bool = False
+):
     """
     download all the svgs for each region from dotlan and extract system_ids, system x-y coords, and connection data
 
     if build_data=True will re-download and re-pickled
     """
+    progress_bar = ProgressBar(None) if progress_bar is None else progress_bar
     pickle_file_name = "data/pickled_dotlan_maps"
 
     data = {}
     pickled_file_exists = os.path.exists(pickle_file_name)
     region_data = None
     for region in REGION_NAMES:
-        if progress_bar is not None:
-            progress_bar.title(f"Loading {region} from Dotlan")
+        base_update_string = f"Dotlan[{region}]"
+        progress_bar.Update(base_update_string)
 
         if not build_data and pickled_file_exists and len(data) <= 0:
+            progress_bar.Update(f"{base_update_string}: Load Pickle")
             with open(pickle_file_name, "rb") as pickleFile:
                 data = load(pickleFile)
 
         if build_data or not pickled_file_exists:
             if region_data is None:
+                progress_bar.Update(f"{base_update_string}: Region Offset")
                 region_data = build_region_central_coordinates()
 
-            content = get_map(region)
-            data[region] = parse_map(content, client, region, region_data)
+            if data.get(region, None) is None:
+                progress_bar.Update(f"{base_update_string}: Refresh data")
+                content = get_map(region)
+                data[region] = parse_map(content, client, region, region_data, force_dotlan_scrape)
+                sleep(15)
+
+            load_dotlan_extra_data(region, force_dotlan_scrape, data[region]["systems"], progress_bar)
 
         attach_dotlan_data(client, data[region])
 
-        if progress_bar is not None:
-            progress_bar()
+        progress_bar.Advance()
 
     with open(pickle_file_name, "wb") as pickleFile:
         print(f"Pickling dotlan map data")
