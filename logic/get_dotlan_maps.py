@@ -15,6 +15,7 @@ from models.third_party.dotlan import *
 REGION_X_OFFSET = 1000
 REGION_Y_OFFSET = 1000
 BASE_URL = "https://evemaps.dotlan.net/svg/"
+DEFAULT_PAUSE_COUNT = 5  # how long to pause between region pulls/scrapes when rebuilding all data
 
 REGION_NAMES = [
     "Aridia",
@@ -312,6 +313,7 @@ def get_all_dotlan_data(
 
     if build_data=True will re-download and re-pickled
     """
+    os.system("cls" if os.name == "nt" else "clear")
     progress_bar = ProgressBar(None) if progress_bar is None else progress_bar
     pickle_file_name = "data/pickled_dotlan_maps"
 
@@ -336,11 +338,17 @@ def get_all_dotlan_data(
                 progress_bar.Update(f"{base_update_string}: Refresh data")
                 content = get_map(region)
                 data[region] = parse_map(content, client, region, region_data, force_dotlan_scrape)
-                sleep(15)
+                pause_count = DEFAULT_PAUSE_COUNT
+                while pause_count > 0:
+                    progress_bar.Update(f"{base_update_string}: Refresh data {pause_count}")
+                    sleep(1)
+                    pause_count -= 1
 
             load_dotlan_extra_data(region, force_dotlan_scrape, data[region]["systems"], progress_bar)
 
+        progress_bar.Update(f"Combining {region} with map_data")
         attach_dotlan_data(client, data[region])
+        print(f"{region} dotlan data loaded")
 
         progress_bar.Advance()
 

@@ -1,4 +1,5 @@
 import codecs
+import os
 from functools import cached_property
 from pickle import dump, load
 from time import perf_counter
@@ -135,6 +136,7 @@ def BuildMapData(client: mapData.MapClient, include_pi_data: bool = False):
 
     tasks = len(data_files)
     tasks += len(RawResources)
+    os.system("cls" if os.name == "nt" else "clear")
 
     with alive_bar(tasks, title_length=40) as bar:
         for key, value in data_files.items():
